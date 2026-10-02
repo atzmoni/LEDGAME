@@ -40,19 +40,26 @@ export class Strip extends EventTarget {
     const server = await dev.gatt.connect();
     const svc = await server.getPrimaryService(SERVICE);
     this.ch = await svc.getCharacteristic(WRITE);
-    // Optional read-back channel; OC21 units stay silent, OA10 may answer queries here.
-    try {
-      const n = await svc.getCharacteristic(NOTIFY);
-      n.addEventListener("characteristicvaluechanged", e =>
-        this.dispatchEvent(new CustomEvent("notify", { detail: new Uint8Array(e.target.value.buffer) })));
-      await n.startNotifications();
-      this.canListen = true;
-    } catch { this.canListen = false; }
     // Handshake the open-source integration sends to MELK units first.
     await this.send([0x7E, 0x07, 0x83]);
     await sleep(300);
     await this.send([0x7E, 0x04, 0x04]);
+    this.svc = svc;
     return dev.name || "";
+  }
+
+  // Optional read-back channel; OC21 units stay silent, OA10 may answer queries on FFF4.
+  // Subscribed only on request: on Android a pending GATT call makes concurrent writes fail.
+  async listen() {
+    if (this.canListen) return true;
+    try {
+      const n = await this.svc.getCharacteristic(NOTIFY);
+      n.addEventListener("characteristicvaluechanged", e =>
+        this.dispatchEvent(new CustomEvent("notify", { detail: new Uint8Array(e.target.value.buffer) })));
+      await Promise.race([n.startNotifications(), sleep(3000).then(() => { throw new Error("timeout"); })]);
+      this.canListen = true;
+    } catch { this.canListen = false; }
+    return this.canListen;
   }
 
   // Serialized writes with a 30 ms gap; the controller drops frames sent back to back.

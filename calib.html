@@ -92,7 +92,7 @@ pre { margin: 0; font: .8rem var(--mono); background: var(--bg); border: 1px sol
 </main>
 
 <script type="module">
-import { sharedStrip, frames, colorFormat } from "./led.js?v=5";
+import { sharedStrip, frames, colorFormat } from "./led.js?v=6";
 const $ = id => document.getElementById(id);
 const strip = sharedStrip();
 const KEY = "ledgame.rope";
@@ -135,9 +135,11 @@ const hex = a => Array.from(a, x => x.toString(16).padStart(2, "0")).join(" ");
 let lines = [];
 function log(t) { lines.unshift(t); lines = lines.slice(0, 30); $("log").textContent = lines.join("\n"); }
 strip.addEventListener("notify", e => log(new Date().toLocaleTimeString() + "  " + hex(e.detail)));
-$("query").onclick = () => {
+$("query").onclick = async () => {
   if (!strip.connected) return setStatus("לא מחובר", "err");
-  if (strip.canListen === false) return log("הבקר הזה לא מאפשר קריאה");
+  log("מתחבר לערוץ הקריאה…");
+  await strip.queue;
+  if (!(await strip.listen())) return log("הבקר הזה לא מאפשר קריאה");
   log("שאלתי את הבקר…");
   strip.send(frames.query());
 };
@@ -147,6 +149,8 @@ $("connect").onclick = async () => {
   try { setStatus("מחפש…"); const name = await strip.connect(); setStatus("מחובר: " + name, "on"); lightWhite(); }
   catch (e) { setStatus(e.message, "err"); }
 };
+strip.addEventListener("error", e => setStatus("שגיאה בשליחה: " + (e.detail?.message || e.detail), "err"));
+strip.addEventListener("sent", () => { if ($("status").classList.contains("err") && strip.connected) setStatus("נשלח ✓", "on"); });
 strip.addEventListener("disconnect", () => setStatus("התנתק", "err"));
 if (strip.connected) lightWhite();
 </script>
