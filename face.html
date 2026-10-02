@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LedGame Face</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: selfie camera on top, a cartoon face that mirrors yours in the corner, with a live readout; below it a legend of gestures that lights up the one being performed. Single dark look. */
+:root {
+  --bg: #0d1117;
+  --panel: #161c25;
+  --line: #263041;
+  --fg: #e6ebf2;
+  --muted: #8592a6;
+  --accent: #35d0ba;
+  --bad: #ef6461;
+  --display: "Heebo", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--display); }
+main { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: calc(12px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+h1 { margin: 0; font-weight: 800; font-size: 1.4rem; }
+a { color: var(--accent); }
+.stage { position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 3 / 4; max-height: 55vh; width: 100%; }
+video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 24px; }
+.face { position: absolute; inset: auto; bottom: 10px; inset-inline-end: 10px; width: 110px; height: 110px; border-radius: 16px; background: rgba(13,17,23,.78); border: 1px solid var(--line); transform: none; }
+.modes { display: flex; gap: 6px; }
+.modes a { flex: 1; text-align: center; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: #1f2734; color: var(--fg); text-decoration: none; font-weight: 600; }
+.modes a[aria-current="page"] { border-color: var(--accent); color: var(--accent); }
+.meter { position: absolute; top: 8%; bottom: 8%; inset-inline-start: 10px; width: 14px; border-radius: 99px; border: 2px solid rgba(255,255,255,.5); overflow: hidden; }
+.meter i { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: var(--accent); transition: height .08s linear; }
+.hud { position: absolute; top: 10px; inset-inline-end: 10px; display: grid; gap: 6px; justify-items: end; }
+.chip { font: 600 .85rem var(--mono); background: rgba(13,17,23,.78); padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); }
+.swatch { width: 40px; height: 40px; border-radius: 50%; border: 3px solid #fff; background: var(--sw, #000); }
+.toast { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 1.5rem; font-weight: 800; text-shadow: 0 2px 10px #000; white-space: nowrap; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: 600 1rem var(--display); color: var(--fg); background: #1f2734; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: #062a24; border-color: transparent; }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: .45; }
+.status { font: .85rem var(--mono); padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); }
+.status.on { color: var(--accent); border-color: var(--accent); }
+.status.err { color: var(--bad); border-color: var(--bad); }
+.legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.g { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; gap: 10px; align-items: center; transition: border-color .15s, background .15s; }
+.g .ico { font-size: 1.7rem; line-height: 1; }
+.g b { display: block; font-size: .95rem; }
+.g small { color: var(--muted); font-size: .8rem; }
+.g.active { border-color: var(--accent); background: #12302c; }
+.help { color: var(--muted); font-size: .9rem; margin: 0; }
+.embedded header, .embedded #connect, .embedded #status { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>מחוות פנים</h1>
+    <a href="./">לדף הראשי</a>
+  </header>
+
+  <nav class="modes" aria-label="סוג מחוות">
+    <a href="gestures.html?v=10">ידיים</a>
+    <a href="face.html?v=10" aria-current="page">פנים</a>
+  </nav>
+
+  <div class="stage">
+    <div class="placeholder" id="ph">לחץ "הפעל מצלמה" והסתכל אל הטלפון</div>
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div class="meter" aria-hidden="true"><i id="meterFill"></i></div>
+    <div class="hud">
+      <span class="chip" id="expr">אין פנים</span>
+      <span class="chip" id="fxChip">אפקט —</span>
+      <div class="swatch" id="swatch"></div>
+    </div>
+    <canvas class="face" id="face" width="220" height="220" aria-label="פרצוף שמחקה אותך"></canvas>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="row">
+    <button class="primary" id="connect">התחבר לפס</button>
+    <button id="cam">הפעל מצלמה</button>
+    <span class="status" id="status">לא מחובר</span>
+  </div>
+
+  <div class="row" role="group" aria-label="מה פתיחת הפה משנה">
+    <span class="help">פתיחת הפה משנה:</span>
+    <button data-m="bright" aria-pressed="true">בהירות</button>
+    <button data-m="speed" aria-pressed="false">מהירות</button>
+    <button data-m="none" aria-pressed="false">כלום</button>
+  </div>
+
+  <div class="legend" id="legend"></div>
+  <p class="help">כל הבעה פועלת פעם אחת. כדי להפעיל אותה שוב, חזור לפרצוף רגיל ועשה אותה שוב.</p>
+</main>
+
+<script type="module">
+import { sharedStrip, frames, colorFormat, hueToRgb } from "./led.js?v=10";
+import { FilesetResolver, FaceLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs";
+
+const $ = id => document.getElementById(id);
+const strip = sharedStrip();
+const fmt = colorFormat();
+
+const COLORS = [["אדום", 0], ["כתום", 30], ["צהוב", 55], ["ירוק", 120], ["תכלת", 185], ["כחול", 230], ["סגול", 275], ["ורוד", 320]];
+const state = { fx: 0, color: -1, on: true, mouthMode: "bright" };
+const RUN_IDS = Array.from({ length: 27 }, (_, i) => 89 + i * 2);
+
+// Each expression is a test on MediaPipe's blendshape scores (0..1) and the action it fires.
+const EXPR = {
+  winkR:  { ico: "😉", name: "קריצה ימין", does: "צבע הבא",        test: b => b.eyeBlinkRight > 0.55 && b.eyeBlinkLeft < 0.3, run: () => stepColor(1) },
+  winkL:  { ico: "😉", name: "קריצה שמאל", does: "צבע קודם",       test: b => b.eyeBlinkLeft > 0.55 && b.eyeBlinkRight < 0.3, run: () => stepColor(-1) },
+  smile:  { ico: "😄", name: "חיוך",       does: "צהוב שמח",       test: b => (b.mouthSmileLeft + b.mouthSmileRight) / 2 > 0.6, run: () => setColor(2) },
+  sad:    { ico: "☹️", name: "עצב",        does: "כחול עצוב",      test: b => (b.mouthFrownLeft + b.mouthFrownRight) / 2 > 0.3, run: () => setColor(5) },
+  brows:  { ico: "🤨", name: "הרמת גבות",  does: "אפקט הבא",       test: b => b.browInnerUp > 0.6 && (b.browOuterUpLeft + b.browOuterUpRight) / 2 > 0.35, run: () => setFx(state.fx + 1) },
+  angry:  { ico: "😠", name: "כיווץ גבות", does: "אדום",           test: b => (b.browDownLeft + b.browDownRight) / 2 > 0.5, run: () => setColor(0) },
+  kiss:   { ico: "😘", name: "נשיקה",      does: "ורוד",           test: b => b.mouthPucker > 0.7, run: () => setColor(7) },
+  puff:   { ico: "🐡", name: "ניפוח לחיים", does: "הבהובי מסיבה",  test: b => b.cheekPuff > 0.45, run: party },
+  nose:   { ico: "😤", name: "עיקום אף",   does: "אפקט ריצה אקראי", test: b => (b.noseSneerLeft + b.noseSneerRight) / 2 > 0.45, run: randomRun },
+  stretch:{ ico: "😬", name: "מתיחת שפתיים", does: "לבן",          test: b => (b.mouthStretchLeft + b.mouthStretchRight) / 2 > 0.5, run: white },
+  eyes:   { ico: "😌", name: "עיניים עצומות", does: "הדלקה / כיבוי", test: b => b.eyeBlinkLeft > 0.6 && b.eyeBlinkRight > 0.6, run: () => power(!state.on), hold: 900 },
+};
+const MOUTH = { ico: "😮", name: "פתיחת פה" };
+
+function rgbOf(i) { return hueToRgb(COLORS[i][1]); }
+function setColor(i) {
+  state.color = (i + COLORS.length) % COLORS.length;
+  strip.send(frames.rgb(...rgbOf(state.color), fmt));
+  toast(COLORS[state.color][0]); renderHud();
+}
+const stepColor = d => setColor((state.color < 0 ? -1 : state.color) + d);
+function setFx(id) {
+  state.fx = (id + 213) % 213; state.color = -1;
+  strip.send(frames.fx(state.fx));
+  toast(`אפקט ${state.fx}`); renderHud();
+}
+function randomRun() { setFx(RUN_IDS[Math.floor(Math.random() * RUN_IDS.length)]); strip.send(frames.spd(90)); toast("ריצה!"); }
+function white() { state.color = -1; strip.send(frames.rgb(255, 255, 255, fmt)); toast("לבן"); renderHud("#fff"); }
+function power(on) { state.on = on; strip.send(on ? frames.on() : frames.off()); toast(on ? "דולק" : "כבוי"); }
+async function party() {
+  toast("מסיבה!");
+  for (let i = 0; i < 8; i++) { await strip.send(frames.rgb(...hueToRgb((i * 137) % 360), fmt)); await new Promise(r => setTimeout(r, 110)); }
+  if (state.color >= 0) strip.send(frames.rgb(...rgbOf(state.color), fmt)); else strip.send(frames.fx(state.fx));
+}
+
+// ---- UI ----
+function renderLegend(active) {
+  const mouthDoes = { bright: "פה פתוח = בהיר", speed: "פה פתוח = מהיר", none: "לא משנה כלום" }[state.mouthMode];
+  $("legend").innerHTML = [...Object.entries(EXPR), ["mouth", { ...MOUTH, does: mouthDoes }]].map(([k, a]) =>
+    `<div class="g${k === active ? " active" : ""}"><span class="ico">${a.ico}</span><span><b>${a.name}</b><small>${a.does}</small></span></div>`).join("");
+}
+let faceColor = "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)";
+function renderHud(css) {
+  $("fxChip").textContent = state.color >= 0 ? `צבע ${COLORS[state.color][0]}` : `אפקט ${state.fx}`;
+  faceColor = css || (state.color >= 0 ? `hsl(${COLORS[state.color][1]} 100% 50%)` : "#35d0ba");
+  $("swatch").style.background = state.color >= 0 || css ? faceColor : "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)";
+}
+let toastTimer = 0;
+function toast(t) { $("toast").textContent = t; clearTimeout(toastTimer); toastTimer = setTimeout(() => $("toast").textContent = "", 1200); }
+renderLegend(); renderHud();
+
+document.querySelectorAll("[data-m]").forEach(b => b.onclick = () => {
+  state.mouthMode = b.dataset.m;
+  document.querySelectorAll("[data-m]").forEach(x => x.setAttribute("aria-pressed", x === b));
+  renderLegend();
+});
+
+function setStatus(t, cls) { const s = $("status"); s.textContent = t; s.className = "status " + (cls || ""); }
+$("connect").onclick = async () => {
+  try { setStatus("מחפש…"); const name = await strip.connect(); setStatus("מחובר: " + name, "on"); }
+  catch { setStatus("לא מחובר", "err"); }
+};
+strip.addEventListener("disconnect", () => setStatus("התנתק", "err"));
+
+// ---- camera + face tracking ----
+let landmarker = null;
+$("cam").onclick = async () => {
+  $("cam").disabled = true;
+  $("ph").textContent = "טוען זיהוי פנים…";
+  try {
+    const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm");
+    landmarker = await FaceLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        delegate: "GPU",
+      },
+      runningMode: "VIDEO",
+      numFaces: 1,
+      outputFaceBlendshapes: true,
+    });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 }, audio: false });
+    const v = $("video");
+    v.srcObject = stream;
+    await v.play();
+    $("ph").hidden = true;
+    requestAnimationFrame(loop);
+  } catch (e) {
+    $("ph").textContent = "לא הצלחתי לפתוח מצלמה: " + e.message;
+    $("cam").disabled = false;
+  }
+};
+
+const ctx = $("overlay").getContext("2d");
+let lastVideoTime = -1, mouth = 0, lastMouthSent = { key: "", t: 0 };
+let candidate = "", candidateSince = 0, armed = true;
+
+function loop() {
+  const v = $("video"), c = $("overlay");
+  if (v.currentTime !== lastVideoTime) {
+    lastVideoTime = v.currentTime;
+    const now = performance.now();
+    const res = landmarker.detectForVideo(v, now);
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    ctx.clearRect(0, 0, c.width, c.height);
+    const pts = res.faceLandmarks && res.faceLandmarks[0];
+    const cats = res.faceBlendshapes && res.faceBlendshapes[0] && res.faceBlendshapes[0].categories;
+    if (pts && cats) {
+      ctx.fillStyle = "rgba(53,208,186,.7)";
+      for (let i = 0; i < pts.length; i += 4) ctx.fillRect(pts[i].x * c.width - 1, pts[i].y * c.height - 1, 2, 2);
+      const b = {}; for (const k of cats) b[k.categoryName] = k.score;
+      mouthControl(b.jawOpen, now);
+      drawFace(b);
+      handle(Object.keys(EXPR).find(k => EXPR[k].test(b)) || "neutral", now);
+    } else { handle("neutral", now); $("expr").textContent = "אין פנים"; }
+  }
+  requestAnimationFrame(loop);
+}
+
+// Mouth opening is continuous: it drives brightness or speed like a dimmer.
+function mouthControl(jaw, now) {
+  mouth = mouth * 0.6 + Math.min(1, jaw / 0.6) * 0.4;
+  $("meterFill").style.height = Math.round(mouth * 100) + "%";
+  if (state.mouthMode === "none" || !strip.connected) return;
+  const v = Math.max(1, Math.round(mouth * 100));
+  const key = state.mouthMode + Math.round(v / 5);
+  if (key === lastMouthSent.key || now - lastMouthSent.t < 90) return;
+  lastMouthSent = { key, t: now };
+  strip.sendLatest(state.mouthMode === "bright" ? frames.bri(Math.max(5, v)) : frames.spd(v));
+}
+
+// An expression fires once after it is held (200 ms, longer for closed eyes) and re-arms on a neutral face.
+function handle(k, now) {
+  const a = EXPR[k];
+  $("expr").textContent = a ? `${a.ico} ${a.name}` : (mouth > 0.3 ? `${MOUTH.ico} ${MOUTH.name}` : "🙂 רגיל");
+  if (k !== candidate) { candidate = k; candidateSince = now; renderLegendOnce(k === "neutral" && mouth > 0.3 ? "mouth" : k); }
+  if (!a) { armed = true; return; }
+  if (!armed || now - candidateSince < (a.hold || 200)) return;
+  armed = false;
+  if (strip.connected) a.run(); else toast(a.does + " (הפס לא מחובר)");
+}
+let legendShown = "";
+function renderLegendOnce(k) { if (k !== legendShown) { legendShown = k; renderLegend(k); } }
+
+// Test hook: feeds blendshape scores without a camera.
+window.__faceTest = (b, now) => { const z = new Proxy(b, { get: (o, k) => o[k] ?? 0 }); mouthControl(z.jawOpen, now); drawFace(z); handle(Object.keys(EXPR).find(k => EXPR[k].test(z)) || "neutral", now); };
+
+// ---- cartoon face that copies yours ----
+const fctx = $("face").getContext("2d");
+function drawFace(b) {
+  const W = 220, cx = 110, cy = 115;
+  fctx.clearRect(0, 0, W, W);
+  fctx.fillStyle = faceColor.startsWith("conic") ? "#35d0ba" : faceColor;
+  fctx.beginPath(); fctx.arc(cx, cy, 90 + b.cheekPuff * 12, 0, Math.PI * 2); fctx.fill();
+  fctx.fillStyle = fctx.strokeStyle = "#0d1117"; fctx.lineWidth = 7; fctx.lineCap = "round";
+  // The drawing is mirrored like the camera: your right eye appears on the right.
+  for (const [side, blink, browDown, browUp] of [[-1, b.eyeBlinkLeft, b.browDownLeft, b.browOuterUpLeft], [1, b.eyeBlinkRight, b.browDownRight, b.browOuterUpRight]]) {
+    const ex = cx + side * 35, ey = cy - 20;
+    const open = Math.max(0.08, 1 - blink) * (1 + b.eyeWideLeft * 0.4);
+    fctx.beginPath(); fctx.ellipse(ex, ey, 13, 15 * open, 0, 0, Math.PI * 2); fctx.fill();
+    const lift = (b.browInnerUp + browUp) * 14 - browDown * 10;
+    fctx.beginPath(); fctx.moveTo(ex - 18, ey - 30 - lift + browDown * side * -6); fctx.lineTo(ex + 18, ey - 30 - lift - browDown * side * -6); fctx.stroke();
+  }
+  const smile = (b.mouthSmileLeft + b.mouthSmileRight) / 2 - (b.mouthFrownLeft + b.mouthFrownRight) / 2;
+  const width = 32 * (1 - b.mouthPucker * 0.6) * (1 + (b.mouthStretchLeft + b.mouthStretchRight) * 0.3);
+  const my = cy + 42, open = b.jawOpen * 34;
+  fctx.beginPath();
+  fctx.moveTo(cx - width, my - smile * 10);
+  fctx.quadraticCurveTo(cx, my + smile * 30 + open, cx + width, my - smile * 10);
+  if (open > 4) { fctx.quadraticCurveTo(cx, my + smile * 10 - open * 0.2, cx - width, my - smile * 10); fctx.fill(); }
+  else fctx.stroke();
+}
+</script>
+</body>
+</html>
