@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LedGame Magic</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a quiet performer screen; one big start button, level stepper, and a discreet result row. Single dark look. */
+:root {
+  --bg: #0d1117;
+  --panel: #161c25;
+  --line: #263041;
+  --fg: #e6ebf2;
+  --muted: #8592a6;
+  --accent: #35d0ba;
+  --bad: #ef6461;
+  --display: "Heebo", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--display); }
+main { max-width: 1200px; margin: 0 auto; padding-inline: 16px; padding-block: calc(12px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+h1 { margin: 0; font-weight: 800; font-size: 1.4rem; }
+a { color: var(--accent); }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 10px; }
+h2 { margin: 0; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button.b { font: 600 1rem var(--display); color: var(--fg); background: #1f2734; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: #062a24; border-color: transparent; }
+button.primary[aria-pressed="true"] { background: var(--bad); color: #fff; }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+label { display: grid; gap: 4px; font-size: .9rem; color: var(--muted); flex: 1 1 180px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+select { font: 1rem var(--display); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+.status { font: .85rem var(--mono); padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); }
+.levels { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.levels button { padding: 12px 0; font: 800 1.2rem var(--mono); }
+#go { font: 800 1.4rem var(--display); padding: 22px; width: 100%; }
+#go[aria-pressed="true"] { background: var(--bad); color: #fff; }
+.dots { display: flex; gap: 10px; justify-content: center; min-height: 44px; flex-wrap: wrap; }
+.dots i { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--line); background: var(--c, transparent); }
+.state { text-align: center; font: 600 1.05rem var(--display); color: var(--muted); margin: 0; min-height: 1.6em; }
+.heard { font: .82rem var(--mono); color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; min-height: 3em; margin: 0; }
+.swatches { display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; }
+.swatches button { aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--line); background: var(--c); padding: 0; }
+input.txt { font: 1rem var(--display); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; width: 100%; }
+.embedded header, .embedded #connect, .embedded #status { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>קסמים</h1>
+    <a href="./">לדף הראשי</a>
+  </header>
+
+  <div class="row">
+    <button class="b primary" id="connect">התחבר לפס</button>
+    <span class="status" id="status">לא מחובר</span>
+  </div>
+
+  <section>
+    <h2>רמה: כמה צבעים הקהל בוחר</h2>
+    <div class="levels" id="levels"></div>
+  </section>
+
+  <button class="b primary" id="go" aria-pressed="false">התחל להקשיב</button>
+  <p class="state" id="state">לחץ, ותן לקהל לבחור צבעים.</p>
+  <div class="dots" id="dots" aria-label="התוצאה"></div>
+
+  <section>
+    <h2>הגדרות</h2>
+    <label>מילת הקסם
+      <input class="txt" id="phrase" value="אני חוזר">
+    </label>
+    <label><span>השהיה עד שהחבל נדלק: <output id="delayOut">3</output> שניות</span>
+      <input type="range" id="delay" min="0" max="10" value="3">
+    </label>
+    <div class="row">
+      <button class="b" id="stop">כבה תוצאה</button>
+      <button class="b" id="showHeard" aria-pressed="false">הצג מה נשמע</button>
+    </div>
+    <p class="heard" id="heard" hidden></p>
+  </section>
+
+  <section>
+    <h2>גיבוי ידני</h2>
+    <p class="help">אם המיקרופון לא הבין, לחץ על הצבעים לפי הסדר.</p>
+    <div class="swatches" id="swatches"></div>
+  </section>
+</main>
+
+<script type="module">
+import { sharedStrip, frames, colorFormat } from "./led.js?v=9";
+const $ = id => document.getElementById(id);
+const strip = sharedStrip();
+const fmt = colorFormat();
+
+// Colour words in Hebrew (all genders and plurals start with these roots) and a few English ones.
+const COLORS = [
+  { name: "אדום",  rgb: [255, 0, 0],     roots: ["אדו", "אדמ", "red"] },
+  { name: "כתום",  rgb: [255, 80, 0],    roots: ["כתו", "orange"] },
+  { name: "צהוב",  rgb: [255, 200, 0],   roots: ["צהו", "yellow"] },
+  { name: "ירוק",  rgb: [0, 255, 0],     roots: ["ירו", "green"] },
+  { name: "תכלת",  rgb: [0, 200, 255],   roots: ["תכל", "טורקיז", "cyan"] },
+  { name: "כחול",  rgb: [0, 0, 255],     roots: ["כחו", "blue"] },
+  { name: "סגול",  rgb: [150, 0, 255],   roots: ["סגו", "purple"] },
+  { name: "ורוד",  rgb: [255, 0, 140],   roots: ["ורו", "pink"] },
+  { name: "לבן",   rgb: [255, 255, 255], roots: ["לבן", "לבנ", "white"] },
+];
+const css = c => `rgb(${c.rgb.join(",")})`;
+
+function colorOf(word) {
+  const w = word.toLowerCase().replace(/[֑-ׇ"'.,!?]/g, "");
+  const find = x => COLORS.find(c => c.roots.some(r => x.startsWith(r)));
+  // "ורוד" starts with ו, so try the word as is before stripping the "and"/"the" prefixes.
+  return find(w) || find(w.replace(/^(וה|ו|ה)/, ""));
+}
+const norm = t => t.replace(/[֑-ׇ.,!?]/g, "").replace(/\s+/g, " ").trim();
+
+// ---- level ----
+let level = 1;
+try { level = +localStorage.getItem("ledgame.magicLevel") || 1; } catch {}
+$("levels").innerHTML = [1, 2, 3, 4, 5, 6].map(n => `<button class="b" data-l="${n}" aria-pressed="${n === level}">${n}</button>`).join("");
+document.querySelectorAll("[data-l]").forEach(b => b.onclick = () => {
+  level = +b.dataset.l;
+  document.querySelectorAll("[data-l]").forEach(x => x.setAttribute("aria-pressed", x === b));
+  try { localStorage.setItem("ledgame.magicLevel", level); } catch {}
+});
+$("delay").oninput = () => $("delayOut").textContent = $("delay").value;
+$("showHeard").onclick = () => {
+  const on = $("heard").hidden;
+  $("heard").hidden = !on; $("showHeard").setAttribute("aria-pressed", on);
+};
+
+// ---- result on screen and on the rope ----
+function dots(list) { $("dots").innerHTML = list.map(c => `<i style="--c:${css(c)}" title="${c.name}"></i>`).join(""); }
+let showToken = 0;
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function reveal(list) {
+  const token = ++showToken;
+  dots(list);
+  $("state").textContent = "…";
+  await wait(+$("delay").value * 1000);
+  if (token !== showToken) return;
+  $("state").textContent = list.map(c => c.name).join(" · ");
+  if (!strip.connected) return;
+  strip.send(frames.on());
+  if (list.length === 1) {
+    strip.send(frames.rgb(...list[0].rgb, fmt)); strip.send(frames.bri(100));
+    return;
+  }
+  // The controller lights the whole rope at once, so a combination plays as a sequence that repeats.
+  while (token === showToken) {
+    for (const c of list) {
+      if (token !== showToken) return;
+      strip.send(frames.rgb(...c.rgb, fmt)); strip.send(frames.bri(100));
+      await wait(1300);
+      strip.send(frames.bri(1));   // a short gap, so "yellow, yellow" reads as two
+      await wait(300);
+    }
+    await wait(1200);
+  }
+}
+$("stop").onclick = () => { showToken++; dots([]); $("state").textContent = ""; if (strip.connected) strip.send(frames.bri(1)); };
+
+// ---- listening ----
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false, finals = "";
+function setGo(on) {
+  listening = on;
+  $("go").textContent = on ? "מקשיב… (לחץ לעצירה)" : "התחל להקשיב";
+  $("go").setAttribute("aria-pressed", on);
+}
+function check(interim) {
+  const text = norm(finals + " " + interim);
+  $("heard").textContent = text || "…";
+  const phrase = norm($("phrase").value);
+  const at = phrase ? text.lastIndexOf(phrase) : -1;
+  if (at < 0) return;
+  const after = text.slice(at + phrase.length).split(" ").map(colorOf).filter(Boolean);
+  $("state").textContent = after.length ? "●".repeat(after.length) : "";
+  if (after.length >= level) { stopListening(); reveal(after.slice(0, level)); }
+}
+function startListening() {
+  if (!SR) { $("state").textContent = "הדפדפן לא תומך בזיהוי דיבור. פתח ב-Chrome."; return; }
+  showToken++; dots([]); finals = "";
+  rec = new SR();
+  rec.lang = "he-IL"; rec.continuous = true; rec.interimResults = true;
+  rec.onresult = e => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) finals += " " + e.results[i][0].transcript;
+      else interim += " " + e.results[i][0].transcript;
+    }
+    check(interim);
+  };
+  rec.onerror = e => { if (e.error === "not-allowed") { $("state").textContent = "אין גישה למיקרופון"; setGo(false); } };
+  // Android ends recognition after a pause; keep it going until the trick is done.
+  rec.onend = () => { if (listening) try { rec.start(); } catch {} };
+  rec.start();
+  setGo(true);
+  $("state").textContent = "";
+}
+function stopListening() { setGo(false); try { rec?.stop(); } catch {} }
+$("go").onclick = () => listening ? stopListening() : startListening();
+
+// ---- manual backup ----
+let manual = [];
+$("swatches").innerHTML = COLORS.map((c, i) => `<button data-c="${i}" style="--c:${css(c)}" aria-label="${c.name}"></button>`).join("");
+document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => {
+  if (manual.length >= level) manual = [];
+  manual.push(COLORS[+b.dataset.c]);
+  dots(manual);
+  if (manual.length === level) { stopListening(); reveal(manual); manual = []; }
+});
+
+function setStatus(t, cls) { const s = $("status"); s.textContent = t; s.className = "status " + (cls || ""); }
+$("connect").onclick = async () => {
+  try { setStatus("מחפש…"); const name = await strip.connect(); setStatus("מחובר: " + name, "on"); }
+  catch { setStatus("לא מחובר", "err"); }
+};
+strip.addEventListener("disconnect", () => setStatus("התנתק", "err"));
+
+// Test hook: lets the automated check feed a transcript without a microphone.
+window.__magicHear = t => { finals = t; check(""); };
+</script>
+</body>
+</html>
