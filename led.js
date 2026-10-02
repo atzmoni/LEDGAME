@@ -17,7 +17,7 @@ export const frames = {
   micSens: v => [0x7E, 0x04, 0x06, v, 0xFF, 0xFF, 0xFF, 0x00, 0xEF],
   // State query listed for MELK-OA10 by elkbledom; any answer arrives on FFF4.
   query: () => [0x7E, 0x00, 0x01, 0xFA, 0x00, 0x00, 0x00, 0x00, 0xEF],
-  // Addressable pixel count, 16-bit little-endian. Persists in the controller, like the duoCo app's own setting.
+  // Addressable pixel count, 16-bit little-endian (OC21 spec). On the user's OA10 it cut the lit length to a few LEDs: do not send.
   count: n => [0x7E, 0x07, 0x21, n & 0xFF, (n >> 8) & 0xFF, 0x00, 0xFF, 0x00, 0xEF],
 };
 

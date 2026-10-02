@@ -63,7 +63,7 @@ pre { margin: 0; font: .8rem var(--mono); background: var(--bg); border: 1px sol
 
   <section>
     <h2>1. מספר הלדים</h2>
-    <p class="help">החבל נדלק בלבן. שנה את המספר עד שהחבל דולק בדיוק עד הסוף, ולא יותר.</p>
+    <p class="help">כתוב כאן את מספר הלדים שמוגדר באפליקציית duoCo.</p>
     <div class="count">
       <button class="b" data-d="-10">−10</button>
       <button class="b" data-d="-1">−1</button>
@@ -71,8 +71,7 @@ pre { margin: 0; font: .8rem var(--mono); background: var(--bg); border: 1px sol
       <button class="b" data-d="1">+1</button>
       <button class="b" data-d="10">+10</button>
     </div>
-    <div class="row"><button class="b primary" id="apply">שלח לחבל</button></div>
-    <p class="warn">המספר נשמר בבקר, כמו בהגדרות של אפליקציית duoCo. אם החבל נדלק רק בחלקו, פשוט הגדל את המספר.</p>
+    <p class="warn">כדי לשנות את מספר הלדים בבקר עצמו, משתמשים באפליקציית duoCo.</p>
   </section>
 
   <section>
@@ -92,14 +91,14 @@ pre { margin: 0; font: .8rem var(--mono); background: var(--bg); border: 1px sol
 </main>
 
 <script type="module">
-import { sharedStrip, frames, colorFormat } from "./led.js?v=6";
+import { sharedStrip, frames, colorFormat } from "./led.js?v=7";
 const $ = id => document.getElementById(id);
 const strip = sharedStrip();
 const KEY = "ledgame.rope";
 
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch {}
-$("n").value = saved.count || 100;
+$("n").value = saved.count || 300;
 $("m").value = saved.meters || "";
 
 function save() {
@@ -119,15 +118,9 @@ function lightWhite() {
   strip.send(frames.bri(100));
 }
 
-function apply() {
-  const n = save();
-  if (!strip.connected) return setStatus("לא מחובר", "err");
-  strip.send(frames.count(n));
-  lightWhite();
-}
+// The pixel-count frame (frames.count) truncated the rope to a few LEDs on the user's OA10, so this page only records the number.
 
-document.querySelectorAll("[data-d]").forEach(b => b.onclick = () => { $("n").value = (+$("n").value || 0) + +b.dataset.d; apply(); });
-$("apply").onclick = apply;
+document.querySelectorAll("[data-d]").forEach(b => b.onclick = () => { $("n").value = (+$("n").value || 0) + +b.dataset.d; save(); });
 $("n").onchange = save;
 $("m").oninput = save;
 

@@ -145,11 +145,11 @@ addEventListener("error", e => showError(e.error || e.message));
 addEventListener("unhandledrejection", e => showError(e.reason));
 </script>
 <script type="module">
-import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js?v=6";
+import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js?v=7";
 
 const $ = id => document.getElementById(id);
 const strip = sharedStrip();   // also published as window.ledgameStrip for the tabs
-const V = "?v=6";   // bump on every release so phones don't mix a cached old file with a new one
+const V = "?v=7";   // bump on every release so phones don't mix a cached old file with a new one
 const PAGES = { calib: "calib.html" + V, hand: "camera.html" + V, gestures: "gestures.html" + V, drums: "drums.html" + V, rope: "rope.html" + V };
 
 // ---- connection ----
