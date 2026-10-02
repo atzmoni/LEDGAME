@@ -47,6 +47,10 @@ input[type=number] { font: 1rem var(--mono); background: var(--bg); color: var(-
 .player b { color: var(--pc); }
 .hands { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
 .hands span { font-size: 1.4rem; letter-spacing: 2px; }
+.hand { flex: 1; font-size: 1.05rem; padding: 10px 6px; white-space: nowrap; }
+.hand.lost { text-decoration: line-through; color: var(--muted); border-color: var(--line); background: var(--bg); }
+.player b { font-size: 1.15rem; }
+.alive { font: .8rem var(--mono); color: var(--muted); }
 .hands button { padding: 4px 12px; }
 .note { color: var(--muted); font-size: .85rem; margin: 0; }
 .rules { color: var(--muted); font-size: .9rem; margin: 0; padding-inline-start: 1.2em; }
@@ -60,7 +64,20 @@ input[type=number] { font: 1rem var(--mono); background: var(--bg); color: var(-
   </header>
 
   <section>
+    <h2>לוח תוצאות</h2>
+    <div class="players" id="players"></div>
+    <p class="alive" id="alive"></p>
+    <div class="row">
+      <label>שחקנים <input type="number" id="nPlayers" min="2" max="10" value="3"></label>
+      <label>לדים בחבל <input type="number" id="nLeds" min="20" max="300" value="80"></label>
+      <label>לדים שנשרפים <input type="number" id="burnSize" min="1" max="30" value="2"></label>
+      <button id="reset">משחק חדש</button>
+    </div>
+  </section>
+
+  <section>
     <canvas id="rope" aria-label="החבל"></canvas>
+    <p class="note" id="stripMode" hidden>הסורק רץ על החבל. הטלפון משמש לוח תוצאות.</p>
     <p class="msg" id="msg">כולם תופסים את החבל. לחצו "סובב".</p>
     <button class="go" id="spin">סובב</button>
   </section>
@@ -75,23 +92,16 @@ input[type=number] { font: 1rem var(--mono); background: var(--bg); color: var(-
   </section>
 
   <section>
-    <h2>שחקנים</h2>
-    <div class="players" id="players"></div>
-    <div class="row">
-      <label>שחקנים <input type="number" id="nPlayers" min="2" max="6" value="3"></label>
-      <label>לדים בחבל <input type="number" id="nLeds" min="20" max="300" value="80"></label>
-      <label>גודל שריפה <input type="number" id="burnSize" min="1" max="30" value="6"></label>
-      <button id="reset">משחק חדש</button>
-    </div>
-  </section>
-
-  <section>
     <h2>הפס</h2>
     <div class="row">
       <button class="primary" id="connect">התחבר לפס</button>
       <span class="status" id="status">לא מחובר</span>
     </div>
-    <p class="note">הבקר הנוכחי לא יודע להדליק לד בודד, אז המיקום המדויק מוצג על המסך והפס נותן רק אפקטי אור: הבהוב בזמן הסיבוב, ואדום או ירוק כשהאור נעצר.</p>
+    <div class="row">
+      <label>מספר אפקט הסורק (כמו באפליקציה) <input type="number" id="fxNum" min="1" max="255" value="1"></label>
+      <button id="fxTest">נסה אפקט</button>
+    </div>
+    <p class="note">כשהפס מחובר, הסורק רץ על החבל עצמו בעזרת אפקט מובנה של הבקר, ועוצר כשהמהירות יורדת לאפס. בחר באפליקציית duoCo אפקט של נקודה אחת שרצה, ורשום כאן את המספר שלו. הבקר לא יודע לכבות לד בודד, אז את המקומות השרופים זוכרים בעצמכם.</p>
   </section>
 </main>
 
@@ -101,14 +111,14 @@ import { Strip, frames, colorFormat } from "./led.js";
 const $ = id => document.getElementById(id);
 const strip = new Strip();
 const fmt = colorFormat();
-const PLAYER_COLORS = [["כחול", "#4c8dff"], ["צהוב", "#ffd23f"], ["ירוק", "#5ad17a"], ["סגול", "#b76bff"], ["כתום", "#ff9b3d"], ["ורוד", "#ff6fb5"]];
+const PLAYER_COLORS = [["כחול", "#4c8dff"], ["צהוב", "#ffd23f"], ["ירוק", "#5ad17a"], ["סגול", "#b76bff"], ["כתום", "#ff9b3d"], ["ורוד", "#ff6fb5"], ["תכלת", "#3fd6ff"], ["לבן", "#e6ebf2"], ["אדום", "#ff5a5a"], ["חום", "#c08a5a"]];
 const RULES = {
   burn: [
-    "כל שחקן תופס את החבל בשתי ידיים, איפה שהוא רוצה.",
-    "לוחצים \"סובב\". האור רץ ונעצר במקום אקראי, והאזור סביבו נשרף.",
-    "מי שיד שלו בתוך האזור השרוף מאבד את היד (לחצו − ליד השם שלו).",
-    "אסור לתפוס על מקום שרוף. אחרי כל סיבוב מי שצריך מחליף מקום.",
-    "מי שנשאר בלי ידיים בחוץ. האחרון שנשאר זוכה, או שהחבל נשרף כולו.",
+    "כל שחקן תופס את החבל ביד ימין וביד שמאל. כל יד מכסה בערך 2 לדים.",
+    "לוחצים \"סובב\". הסורק רץ ונעצר במקום אקראי, והלדים שם נשרפים.",
+    "מי שהיד שלו הייתה על הלד שנשרף, לוחצים על היד הזו בלוח התוצאות והיא נמחקת.",
+    "אסור לתפוס על מקום שרוף. מי שצריך מחליף מקום לפני הסיבוב הבא.",
+    "מי ששתי הידיים שלו נמחקו בחוץ. האחרון שנשאר זוכה.",
   ],
   lucky: [
     "כל שחקן תופס את החבל בנקודה אחת.",
@@ -170,6 +180,7 @@ function tick(freq = 880, dur = 0.03) {
 // ---- the spin ----
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function spin() {
+  if (strip.connected) return stripSpin();
   const free = [...burned.keys()].filter(i => !burned[i]);
   if (spinning || !free.length) return;
   spinning = true; $("spin").disabled = true; flash = null;
@@ -196,6 +207,30 @@ async function spin() {
   land(target);
 }
 
+// Scanner on the real strip: run the chosen effect fast, then slow it to a stop.
+async function stripSpin() {
+  if (spinning) return;
+  spinning = true; $("spin").disabled = true;
+  $("msg").textContent = "הסורק רץ…";
+  const fx = Math.max(1, +$("fxNum").value || 1);
+  await strip.send(frames.fx(fx - 1));
+  await strip.send(frames.spd(100));
+  const runFor = 2500 + Math.random() * 3500;
+  const t0 = performance.now();
+  while (performance.now() - t0 < runFor) { tick(900); await sleep(90); }
+  // Slow down in steps, ticking slower, like a wheel losing speed.
+  for (let v = 90; v >= 0; v -= 10) {
+    await strip.send(frames.spd(v));
+    tick(700 - v * 3);
+    await sleep(140 + (90 - v) * 6);
+  }
+  tick(440, 0.3);
+  spinning = false; $("spin").disabled = false;
+  $("msg").textContent = mode === "burn"
+    ? "נעצר! מי שהאור עליו, סמנו את היד שלו בלוח."
+    : "נעצר! היד הכי קרובה לאור זוכה.";
+}
+
 async function land(i) {
   tick(440, 0.25);
   if (mode === "lucky") {
@@ -203,14 +238,14 @@ async function land(i) {
     draw();
     await stripFlash([0, 255, 80], 3);
   } else {
-    const half = Math.floor(+$("burnSize").value / 2);
-    const from = Math.max(0, i - half), to = Math.min(N - 1, i + half);
+    const size = Math.max(1, +$("burnSize").value || 1);
+    const from = Math.max(0, i - Math.floor((size - 1) / 2)), to = Math.min(N - 1, from + size - 1);
     flash = { from, to, color: "#ff5a36" };
     for (let k = from; k <= to; k++) burned[k] = 1;
     draw();
     const left = burned.reduce((a, b) => a + (1 - b), 0);
     $("msg").textContent = left
-      ? `נשרף מלד ${from + 1} עד ${to + 1}. מי שתופס שם מאבד יד!`
+      ? `נשרף מלד ${from + 1} עד ${to + 1}. מי שתפס שם, סמנו את היד בלוח.`
       : "כל החבל נשרף! המשחק נגמר.";
     await stripFlash([255, 30, 0], 3);
   }
@@ -229,30 +264,42 @@ async function stripFlash([r, g, b], times) {
 // ---- players ----
 function renderPlayers() {
   const box = $("players"); box.innerHTML = "";
-  players.forEach((p, idx) => {
+  players.forEach(p => {
     const el = document.createElement("div");
-    el.className = "player" + (mode === "burn" && p.hands === 0 ? " out" : "");
+    const out = mode === "burn" && !p.right && !p.left;
+    el.className = "player" + (out ? " out" : "");
     el.style.setProperty("--pc", p.color);
-    const val = mode === "burn" ? "✋".repeat(p.hands) || "בחוץ" : `${p.wins} נצחונות`;
-    el.innerHTML = `<b>${p.name}</b><div class="hands"><span>${val}</span>
-      <button aria-label="${mode === "burn" ? "הורד יד" : "הוסף נצחון"} ל${p.name}">${mode === "burn" ? "−" : "+"}</button></div>`;
-    el.querySelector("button").onclick = () => {
-      if (mode === "burn") p.hands = Math.max(0, p.hands - 1); else p.wins++;
-      renderPlayers(); checkWinner();
-    };
+    if (mode === "burn") {
+      el.innerHTML = `<b>${p.name}${out ? " · בחוץ" : ""}</b><div class="hands">
+        <button class="hand${p.right ? "" : " lost"}" data-h="right">✋ ימין</button>
+        <button class="hand${p.left ? "" : " lost"}" data-h="left">שמאל ✋</button></div>`;
+      el.querySelectorAll("[data-h]").forEach(b => b.onclick = () => {
+        p[b.dataset.h] = !p[b.dataset.h];   // tap again to undo a mistake
+        renderPlayers(); checkWinner();
+      });
+    } else {
+      el.innerHTML = `<b>${p.name}</b><div class="hands"><span>${p.wins} נצחונות</span>
+        <button aria-label="הוסף נצחון ל${p.name}">+</button></div>`;
+      el.querySelector("button").onclick = () => { p.wins++; renderPlayers(); };
+    }
     box.appendChild(el);
   });
+  if (mode === "burn") {
+    const hands = players.reduce((a, p) => a + p.right + p.left, 0);
+    const alive = players.filter(p => p.right || p.left).length;
+    $("alive").textContent = `${alive} שחקנים במשחק · ${hands} ידיים על החבל`;
+  } else $("alive").textContent = "";
 }
 function checkWinner() {
   if (mode !== "burn") return;
-  const alive = players.filter(p => p.hands > 0);
+  const alive = players.filter(p => p.right || p.left);
   if (alive.length === 1) { $("msg").textContent = `${alive[0].name} ניצח!`; stripFlash([0, 255, 80], 4); }
 }
 function reset() {
   N = Math.min(300, Math.max(20, +$("nLeds").value || 80));
   burned = new Uint8Array(N); dot = -1; flash = null;
-  const n = Math.min(6, Math.max(2, +$("nPlayers").value || 3));
-  players = PLAYER_COLORS.slice(0, n).map(([name, color]) => ({ name, color, hands: 2, wins: 0 }));
+  const n = Math.min(10, Math.max(2, +$("nPlayers").value || 3));
+  players = PLAYER_COLORS.slice(0, n).map(([name, color]) => ({ name, color, right: true, left: true, wins: 0 }));
   $("rules").innerHTML = RULES[mode].map(r => `<li>${r}</li>`).join("");
   $("msg").textContent = "כולם תופסים את החבל. לחצו \"סובב\".";
   $("spin").disabled = false;
@@ -274,9 +321,20 @@ $("connect").onclick = async () => {
     const name = await strip.connect();
     await strip.send(frames.on());
     $("status").textContent = "מחובר: " + name; $("status").className = "status on";
+    $("rope").hidden = true; $("stripMode").hidden = false;
   } catch { $("status").textContent = "לא מחובר"; $("status").className = "status err"; }
 };
-strip.addEventListener("disconnect", () => { $("status").textContent = "התנתק"; $("status").className = "status err"; });
+strip.addEventListener("disconnect", () => {
+  $("status").textContent = "התנתק"; $("status").className = "status err";
+  $("rope").hidden = false; $("stripMode").hidden = true;
+});
+try { $("fxNum").value = localStorage.getItem("ledgame.scanFx") || 1; } catch {}
+$("fxNum").onchange = e => { try { localStorage.setItem("ledgame.scanFx", e.target.value); } catch {} };
+$("fxTest").onclick = async () => {
+  if (!strip.connected) return;
+  await strip.send(frames.fx(Math.max(1, +$("fxNum").value || 1) - 1));
+  await strip.send(frames.spd(60));
+};
 
 reset();
 </script>
