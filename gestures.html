@@ -50,6 +50,7 @@ button:disabled { opacity: .45; }
 .g small { color: var(--muted); font-size: .8rem; }
 .g.active { border-color: var(--accent); background: #12302c; }
 .help { color: var(--muted); font-size: .9rem; margin: 0; }
+.embedded header, .embedded #connect, .embedded #status { display: none; }
 </style>
 </head>
 <body>
@@ -89,11 +90,11 @@ button:disabled { opacity: .45; }
 </main>
 
 <script type="module">
-import { Strip, frames, colorFormat, hueToRgb } from "./led.js";
+import { sharedStrip, frames, colorFormat, hueToRgb } from "./led.js";
 import { FilesetResolver, GestureRecognizer } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs";
 
 const $ = id => document.getElementById(id);
-const strip = new Strip();
+const strip = sharedStrip();
 const fmt = colorFormat();
 
 // ---- what each gesture does ----

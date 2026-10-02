@@ -47,13 +47,14 @@ input[type=number] { font: 1rem var(--mono); background: var(--bg); color: var(-
 .player b { color: var(--pc); }
 .hands { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
 .hands span { font-size: 1.4rem; letter-spacing: 2px; }
-.hand { flex: 1; font-size: 1.05rem; padding: 10px 6px; white-space: nowrap; }
+.hands .hand { flex: 1; min-width: 0; font-size: 1rem; padding: 10px 4px; white-space: nowrap; }
 .hand.lost { text-decoration: line-through; color: var(--muted); border-color: var(--line); background: var(--bg); }
 .player b { font-size: 1.15rem; }
 .alive { font: .8rem var(--mono); color: var(--muted); }
 .hands button { padding: 4px 12px; }
 .note { color: var(--muted); font-size: .85rem; margin: 0; }
 .rules { color: var(--muted); font-size: .9rem; margin: 0; padding-inline-start: 1.2em; }
+.embedded header, .embedded #connect, .embedded #status { display: none; }
 </style>
 </head>
 <body>
@@ -107,10 +108,10 @@ input[type=number] { font: 1rem var(--mono); background: var(--bg); color: var(-
 </main>
 
 <script type="module">
-import { Strip, frames, colorFormat } from "./led.js";
+import { sharedStrip, frames, colorFormat } from "./led.js";
 
 const $ = id => document.getElementById(id);
-const strip = new Strip();
+const strip = sharedStrip();
 const fmt = colorFormat();
 const PLAYER_COLORS = [["כחול", "#4c8dff"], ["צהוב", "#ffd23f"], ["ירוק", "#5ad17a"], ["סגול", "#b76bff"], ["כתום", "#ff9b3d"], ["ורוד", "#ff6fb5"], ["תכלת", "#3fd6ff"], ["לבן", "#e6ebf2"], ["אדום", "#ff5a5a"], ["חום", "#c08a5a"]];
 const RULES = {
@@ -271,8 +272,8 @@ function renderPlayers() {
     el.style.setProperty("--pc", p.color);
     if (mode === "burn") {
       el.innerHTML = `<b>${p.name}${out ? " · בחוץ" : ""}</b><div class="hands">
-        <button class="hand${p.right ? "" : " lost"}" data-h="right">✋ ימין</button>
-        <button class="hand${p.left ? "" : " lost"}" data-h="left">שמאל ✋</button></div>`;
+        <button class="hand${p.right ? "" : " lost"}" data-h="right">ימין</button>
+        <button class="hand${p.left ? "" : " lost"}" data-h="left">שמאל</button></div>`;
       el.querySelectorAll("[data-h]").forEach(b => b.onclick = () => {
         p[b.dataset.h] = !p[b.dataset.h];   // tap again to undo a mistake
         renderPlayers(); checkWinner();
@@ -342,6 +343,7 @@ $("fxNext").onclick = () => stepFx(1);
 $("fxNum").onchange = saveFx;
 
 
+if (strip.connected) { $("rope").hidden = true; $("stripMode").hidden = false; }
 reset();
 </script>
 </body>

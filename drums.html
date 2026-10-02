@@ -47,6 +47,7 @@ select { font: 1rem var(--display); background: var(--bg); color: var(--fg); bor
 .level i { position: absolute; inset-block: 0; inset-inline-start: 0; width: 0%; background: var(--accent); }
 .level b { position: absolute; inset-block: 0; width: 2px; background: #fff; }
 .help { color: var(--muted); font-size: .88rem; margin: 0; }
+.embedded header, .embedded #connect, .embedded #status { display: none; }
 </style>
 </head>
 <body>
@@ -98,10 +99,10 @@ select { font: 1rem var(--display); background: var(--bg); color: var(--fg); bor
 </main>
 
 <script type="module">
-import { Strip, frames, colorFormat } from "./led.js";
+import { sharedStrip, frames, colorFormat } from "./led.js";
 
 const $ = id => document.getElementById(id);
-const strip = new Strip();
+const strip = sharedStrip();
 const fmt = colorFormat();
 
 // ---- sounds, synthesized so the page needs no audio files ----

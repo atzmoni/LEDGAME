@@ -67,6 +67,15 @@ export class Strip extends EventTarget {
   sendLatest(bytes) { if (this.pending < 2) this.send(bytes); }
 }
 
+// Inside the LedGame hub, every tab is a same-origin iframe that reuses the hub's one Bluetooth connection.
+export const embedded = (() => { try { return window.parent !== window && !!window.parent.ledgameStrip; } catch { return false; } })();
+if (embedded) document.documentElement.classList.add("embedded");
+
+export function sharedStrip() {
+  if (embedded) return window.parent.ledgameStrip;
+  return (window.ledgameStrip ||= new Strip());
+}
+
 export function colorFormat() {
   try { return localStorage.getItem("ledgame.fmt") || "a"; } catch { return "a"; }
 }

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>LedGame Bench</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<title>LedGame</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one narrow column of control "modules", like a pedalboard; log at the bottom. Single dark look. */
+/* Layout: an app shell. A slim header carries the brand, a glowing "rope" line and the connection pill;
+   a row of tabs sits under it; the active tab fills the rest of the screen. Single dark look. */
 :root {
   --bg: #0d1117;
   --panel: #161c25;
@@ -15,205 +15,186 @@
   --fg: #e6ebf2;
   --muted: #8592a6;
   --accent: #35d0ba;
-  --warn: #f2b84b;
   --bad: #ef6461;
   --display: "Heebo", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--display); }
-main { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(32px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; }
-h1 { margin: 0; font-weight: 800; font-size: 1.6rem; letter-spacing: -0.01em; }
-.sub { color: var(--muted); margin: 0; font-size: .92rem; }
-section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 10px; }
-h2 { margin: 0; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-button { font: 600 1rem var(--display); color: var(--fg); background: #1f2734; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--display); }
+body { display: flex; flex-direction: column; }
+.top { padding-inline: 16px; padding-block: calc(10px + env(safe-area-inset-top, 0px)) 0; display: grid; gap: 8px; max-width: 760px; width: 100%; margin: 0 auto; }
+.brand { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.brand h1 { margin: 0; font-weight: 800; font-size: 1.45rem; letter-spacing: -0.01em; }
+.rope { height: 4px; border-radius: 99px; background: linear-gradient(90deg, #ff3b3b, #ffb23b, #f5ff3b, #3bff6e, #3bd9ff, #4c6bff, #c03bff, #ff3b9d); background-size: 200% 100%; animation: flow 8s linear infinite; opacity: .35; transition: opacity .3s; }
+.rope.live { opacity: 1; }
+@keyframes flow { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .rope { animation: none; } }
+.pill { font: 600 .82rem var(--mono); padding: 4px 12px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); background: transparent; cursor: pointer; }
+.pill.on { color: var(--accent); border-color: var(--accent); }
+.pill.err { color: var(--bad); border-color: var(--bad); }
+nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 8px; }
+nav::-webkit-scrollbar { display: none; }
+nav button { flex: none; font: 600 .95rem var(--display); color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 99px; padding: 7px 14px; cursor: pointer; }
+nav button[aria-selected="true"] { color: #062a24; background: var(--accent); border-color: var(--accent); }
+nav button small { font-size: .7rem; font-weight: 400; opacity: .8; margin-inline-start: 4px; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button:active { transform: translateY(1px); }
-button.primary { background: var(--accent); color: #062a24; border-color: transparent; }
-button:disabled { opacity: .45; cursor: not-allowed; }
-.swatch { width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 2px solid var(--line); }
+.stage { flex: 1; min-height: 0; border-top: 1px solid var(--line); }
+iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
+
+/* Home tab */
+.home { height: 100%; overflow-y: auto; }
+.home-inner { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: 16px calc(32px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; }
+.hero { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; }
+.hero h2 { margin: 0; font-size: 1.35rem; font-weight: 800; text-wrap: balance; }
+.hero ol { margin: 0; padding-inline-start: 1.2em; color: var(--muted); }
+.big { font: 800 1.15rem var(--display); color: #062a24; background: var(--accent); border: 0; border-radius: 10px; padding: 14px; cursor: pointer; }
+.big:disabled { opacity: .5; cursor: default; }
+.note { color: #f2b84b; font-size: .9rem; margin: 0; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
+h3 { margin: 0; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.b { font: 600 1rem var(--display); color: var(--fg); background: #1f2734; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+.b:disabled { opacity: .45; cursor: default; }
+.sw { width: 42px; height: 42px; border-radius: 50%; border: 2px solid var(--line); padding: 0; cursor: pointer; }
+.sw:disabled { opacity: .45; cursor: default; }
 label { display: grid; gap: 4px; font-size: .9rem; color: var(--muted); flex: 1 1 200px; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
-input[type=number], select { font: 1rem var(--mono); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; width: 6.5em; }
-.status { font-family: var(--mono); font-size: .85rem; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); }
-.status.on { color: var(--accent); border-color: var(--accent); }
-.status.err { color: var(--bad); border-color: var(--bad); }
-#pad { height: 160px; font-size: 1.6rem; font-weight: 800; border-radius: 12px; touch-action: manipulation; user-select: none; }
-#log { font: .78rem/1.45 var(--mono); color: var(--muted); background: var(--bg); border-radius: 6px; padding: 8px; height: 140px; overflow: auto; direction: ltr; text-align: left; white-space: pre-wrap; }
-.note { font-size: .85rem; color: var(--warn); margin: 0; }
+.num { font: 600 1.1rem var(--mono); min-width: 3.5ch; text-align: center; }
+select { font: .95rem var(--display); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.card { text-align: start; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; color: var(--fg); cursor: pointer; font: inherit; display: grid; gap: 2px; }
+.card b { font-size: 1.05rem; }
+.card span { color: var(--muted); font-size: .85rem; }
+.tag { justify-self: start; font: 600 .7rem var(--mono); color: #f2b84b; border: 1px solid #f2b84b; border-radius: 99px; padding: 0 8px; margin-top: 4px; }
 .val { font-family: var(--mono); color: var(--fg); }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>LedGame Bench</h1>
-    <p class="sub">דף בדיקה לבקר duoCo StripX (MELK-OA10). סגור את אפליקציית duoCo לפני החיבור, הבקר מקבל רק טלפון אחד.</p>
-  </header>
+<div class="top">
+  <div class="brand">
+    <h1>LedGame</h1>
+    <button class="pill" id="pill">לא מחובר</button>
+  </div>
+  <div class="rope" id="ropeLine" aria-hidden="true"></div>
+  <nav role="tablist" aria-label="מסכים" id="tabs">
+    <button role="tab" data-tab="home" aria-selected="true">בית</button>
+    <button role="tab" data-tab="hand" aria-selected="false">יד ומצלמה</button>
+    <button role="tab" data-tab="gestures" aria-selected="false">מחוות</button>
+    <button role="tab" data-tab="drums" aria-selected="false">מתופף</button>
+    <button role="tab" data-tab="rope" aria-selected="false">חבל נשרף<small>בפיתוח</small></button>
+  </nav>
+</div>
 
-  <a class="sub" href="camera.html" style="color:var(--accent)">שליטה ביד דרך המצלמה ←</a>
-  <a class="sub" href="gestures.html" style="color:var(--accent)">מחוות ידיים: אגרוף, ✌, נפנוף ←</a>
-  <a class="sub" href="drums.html" style="color:var(--accent)">מתופף: פדים ותיפוף על השולחן ←</a>
-  <a class="sub" href="rope.html" style="color:var(--accent)">משחק חבל נשרף ←</a>
+<div class="stage" id="stage">
+  <div class="home" id="home">
+    <div class="home-inner">
+      <div class="hero">
+        <h2 id="heroTitle">מתחברים לחבל</h2>
+        <ol id="heroSteps">
+          <li>סגרו את אפליקציית duoCo, כי הבקר מקבל רק טלפון אחד.</li>
+          <li>לחצו "התחבר לפס" ובחרו את MELK-OA10 ברשימה.</li>
+        </ol>
+        <button class="big" id="connect">התחבר לפס</button>
+        <p class="note" id="nobt" hidden>הדפדפן הזה לא תומך בבלוטות'. פתחו את הדף ב-Chrome באנדרואיד.</p>
+      </div>
 
-  <p class="note" id="nobt" hidden>הדפדפן הזה לא תומך ב-Web Bluetooth. פתח את הדף ב-Chrome באנדרואיד.</p>
+      <div class="cards" id="cards">
+        <button class="card" data-go="hand"><b>יד ומצלמה</b><span>גובה היד משנה צבע ובהירות, ומשחק התאמת צבעים</span></button>
+        <button class="card" data-go="gestures"><b>מחוות</b><span>אגרוף, סימן ניצחון ונפנוף מחליפים אפקטים וצבעים</span></button>
+        <button class="card" data-go="drums"><b>מתופף</b><span>פדים של תופים ותיפוף על השולחן שמהבהבים בחבל</span></button>
+        <button class="card" data-go="rope"><b>חבל נשרף</b><span>משחק מסיבה עם לוח תוצאות</span><em class="tag">בפיתוח</em></button>
+      </div>
 
-  <section>
-    <h2>חיבור</h2>
-    <div class="row">
-      <button class="primary" id="connect">התחבר לפס</button>
-      <span class="status" id="status">לא מחובר</span>
+      <section>
+        <h3>שליטה מהירה</h3>
+        <div class="row">
+          <button class="b" data-needs id="on">הדלק</button>
+          <button class="b" data-needs id="off">כבה</button>
+        </div>
+        <div class="row" id="swatches"></div>
+        <label>בהירות <span class="val" id="briV">80</span><input type="range" id="bri" min="1" max="100" value="80" data-needs></label>
+        <div class="row">
+          <span class="help" style="color:var(--muted)">אפקט</span>
+          <button class="b" data-needs id="fxPrev" aria-label="אפקט קודם">−</button>
+          <span class="num" id="fxV">0</span>
+          <button class="b" data-needs id="fxNext" aria-label="אפקט הבא">+</button>
+        </div>
+        <label>מהירות <span class="val" id="spdV">70</span><input type="range" id="spd" min="0" max="100" value="70" data-needs></label>
+        <label>פורמט פקודת צבע (אם הצבעים לא משתנים, החליפו)
+          <select id="fmt"><option value="a">A</option><option value="b">B</option></select>
+        </label>
+      </section>
     </div>
-    <div class="row">
-      <button data-needs id="on">הדלק</button>
-      <button data-needs id="off">כבה</button>
-    </div>
-  </section>
+  </div>
+  <iframe id="frame" title="מסך" hidden allow="camera; microphone; bluetooth; accelerometer"></iframe>
+</div>
 
-  <section>
-    <h2>צבע</h2>
-    <div class="row" id="swatches"></div>
-    <div class="row">
-      <label>צבע חופשי <input type="color" id="picker" value="#ff00aa"></label>
-      <label>פורמט פקודת צבע
-        <select id="fmt"><option value="a">A (07 05 03 … 10)</option><option value="b">B (00 05 03 … 00)</option></select>
-      </label>
-    </div>
-    <label>בהירות <span class="val" id="briV">80</span>
-      <input type="range" id="bri" min="0" max="100" value="80"></label>
-  </section>
+<script type="module">
+import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js";
 
-  <section>
-    <h2>אפקטים</h2>
-    <div class="row">
-      <label>מספר אפקט כמו באפליקציה <input type="number" id="fx" min="1" max="255" value="1"></label>
-      <button data-needs id="fxGo">הפעל</button>
-    </div>
-    <label>מהירות <span class="val" id="spdV">70</span>
-      <input type="range" id="spd" min="0" max="100" value="70"></label>
-  </section>
-
-  <section>
-    <h2>קצב</h2>
-    <button data-needs id="pad">הקש כאן</button>
-    <div class="row">
-      <label>מטרונום BPM <span class="val" id="bpmV">100</span>
-        <input type="range" id="bpm" min="40" max="200" value="100"></label>
-      <button data-needs id="metro">הפעל מטרונום</button>
-    </div>
-  </section>
-
-  <section>
-    <h2>יומן פקודות</h2>
-    <div id="log" aria-live="polite"></div>
-  </section>
-</main>
-
-<script>
-// Remember the colour format so the camera page uses the one that works.
-try { $id("fmt").value = localStorage.getItem("ledgame.fmt") || "a"; } catch {}
-$id("fmt").addEventListener("change", e => { try { localStorage.setItem("ledgame.fmt", e.target.value); } catch {} });
-function $id(id) { return document.getElementById(id); }
-const SERVICE = 0xfff0, WRITE = 0xfff3;
-let dev = null, ch = null, queue = Promise.resolve();
 const $ = id => document.getElementById(id);
-const hex = b => [...b].map(x => x.toString(16).padStart(2, "0").toUpperCase()).join(" ");
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const strip = sharedStrip();   // also published as window.ledgameStrip for the tabs
+const PAGES = { hand: "camera.html", gestures: "gestures.html", drums: "drums.html", rope: "rope.html" };
 
-function log(msg) { const l = $("log"); l.textContent += msg + "\n"; l.scrollTop = l.scrollHeight; }
-function setStatus(t, cls) { const s = $("status"); s.textContent = t; s.className = "status " + (cls || ""); }
-function setEnabled(on) { document.querySelectorAll("[data-needs]").forEach(b => b.disabled = !on); }
-setEnabled(false);
+// ---- connection ----
+function setConnected(on, text) {
+  const p = $("pill");
+  p.textContent = text; p.className = "pill " + (on ? "on" : (text === "לא מחובר" ? "" : "err"));
+  $("ropeLine").classList.toggle("live", on);
+  document.querySelectorAll("[data-needs]").forEach(el => el.disabled = !on);
+  $("connect").textContent = on ? "מחובר ✓" : "התחבר לפס";
+  $("connect").disabled = on;
+  $("heroTitle").textContent = on ? "החבל מחובר. בחרו מסך." : "מתחברים לחבל";
+  $("heroSteps").hidden = on;
+}
+async function connect() {
+  if (strip.connected) return;
+  try { $("pill").textContent = "מחפש…"; const name = await strip.connect(); setConnected(true, "מחובר: " + (name || "MELK")); }
+  catch { setConnected(false, "לא מחובר"); }
+}
+$("connect").onclick = connect;
+$("pill").onclick = connect;
+strip.addEventListener("disconnect", () => setConnected(false, "התנתק, לחצו לחיבור"));
 if (!navigator.bluetooth) { $("nobt").hidden = false; $("connect").disabled = true; }
+setConnected(false, "לא מחובר");
 
-// Writes are serialized with a 30 ms gap; the controller drops frames sent back to back.
-function send(bytes, label) {
-  queue = queue.then(async () => {
-    if (!ch) return;
-    const data = new Uint8Array(bytes);
-    try {
-      if (ch.writeValueWithoutResponse) await ch.writeValueWithoutResponse(data); else await ch.writeValue(data);
-      log((label ? label + ": " : "") + hex(data));
-    } catch (e) { log("שגיאה: " + e.message); }
-    await sleep(30);
-  });
-  return queue;
+// ---- tabs ----
+function show(tab) {
+  if (!PAGES[tab] && tab !== "home") tab = "home";
+  document.querySelectorAll("[data-tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === tab));
+  const f = $("frame");
+  if (tab === "home") {
+    $("home").hidden = false; f.hidden = true;
+    f.src = "about:blank";   // unloading the tab turns its camera or microphone off
+  } else {
+    $("home").hidden = true; f.hidden = false;
+    if (!f.src.endsWith(PAGES[tab])) f.src = PAGES[tab];
+  }
+  if (location.hash.slice(1) !== tab) history.replaceState(null, "", tab === "home" ? location.pathname : "#" + tab);
 }
+document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => show(b.dataset.tab));
+document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => show(b.dataset.go));
+addEventListener("hashchange", () => show(location.hash.slice(1)));
+show(location.hash.slice(1) || "home");
 
-// Frame builders: 7E <len> <op> ... EF, no checksum. Values from the public reverse-engineering of MELK-OA10.
-const F = {
-  on:  () => [0x7E, 0x04, 0x04, 0xF0, 0x00, 0x01, 0xFF, 0x00, 0xEF],
-  off: () => [0x7E, 0x04, 0x04, 0x00, 0x00, 0x00, 0xFF, 0x00, 0xEF],
-  rgb: (r, g, b) => $("fmt").value === "a"
-    ? [0x7E, 0x07, 0x05, 0x03, r, g, b, 0x10, 0xEF]
-    : [0x7E, 0x00, 0x05, 0x03, r, g, b, 0x00, 0xEF],
-  bri: v => [0x7E, 0x04, 0x01, v, 0x01, 0xFF, 0xFF, 0x00, 0xEF],
-  fx:  id => [0x7E, 0x05, 0x03, id, 0x06, 0xFF, 0xFF, 0x00, 0xEF],
-  spd: v => [0x7E, 0x04, 0x02, v, 0xFF, 0xFF, 0xFF, 0x00, 0xEF],
-};
-
-$("connect").onclick = async () => {
-  try {
-    setStatus("מחפש…");
-    dev = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: "MELK" }, { namePrefix: "ELK" }, { namePrefix: "OA10" }],
-      optionalServices: [SERVICE],
-    });
-    dev.addEventListener("gattserverdisconnected", () => { ch = null; setEnabled(false); setStatus("התנתק", "err"); log("החיבור נותק"); });
-    const server = await dev.gatt.connect();
-    const svc = await server.getPrimaryService(SERVICE);
-    ch = await svc.getCharacteristic(WRITE);
-    // Handshake the open-source integration sends to MELK units before anything else.
-    await send([0x7E, 0x07, 0x83], "login");
-    await sleep(300);
-    await send([0x7E, 0x04, 0x04], "login");
-    setStatus("מחובר: " + (dev.name || "ללא שם"), "on");
-    setEnabled(true);
-  } catch (e) { setStatus("לא מחובר", "err"); log("חיבור נכשל: " + e.message); }
-};
-
-$("on").onclick = () => send(F.on(), "הדלקה");
-$("off").onclick = () => send(F.off(), "כיבוי");
-
-const COLORS = [["אדום", 255, 0, 0], ["ירוק", 0, 255, 0], ["כחול", 0, 0, 255], ["צהוב", 255, 200, 0], ["סגול", 160, 0, 255], ["לבן", 255, 255, 255]];
-COLORS.forEach(([name, r, g, b]) => {
-  const s = document.createElement("button");
-  s.className = "swatch"; s.dataset.needs = ""; s.disabled = !ch;
-  s.style.background = `rgb(${r},${g},${b})`; s.title = name; s.setAttribute("aria-label", name);
-  s.onclick = () => send(F.rgb(r, g, b), name);
-  $("swatches").appendChild(s);
-});
-$("picker").onchange = e => {
-  const v = e.target.value; const n = parseInt(v.slice(1), 16);
-  send(F.rgb(n >> 16 & 255, n >> 8 & 255, n & 255), "צבע " + v);
-};
-
-function throttled(fn, ms = 120) { let t = 0, last; return v => { last = v; if (t) return; t = setTimeout(() => { t = 0; fn(last); }, ms); }; }
-const sendBri = throttled(v => send(F.bri(v), "בהירות " + v));
-const sendSpd = throttled(v => send(F.spd(v), "מהירות " + v));
-$("bri").oninput = e => { $("briV").textContent = e.target.value; sendBri(+e.target.value); };
-$("spd").oninput = e => { $("spdV").textContent = e.target.value; sendSpd(+e.target.value); };
-// The app numbers effects from 1; the controller counts from 0.
-$("fxGo").onclick = () => { const n = +$("fx").value; send(F.fx(Math.max(0, n - 1)), "אפקט " + n); };
-
-// Rhythm: a tap or a beat flashes the strip, then blacks it out.
-let hue = 0;
-function flash() {
-  hue = (hue + 1) % COLORS.length;
-  const [, r, g, b] = COLORS[hue];
-  send(F.rgb(r, g, b));
-  setTimeout(() => send(F.rgb(0, 0, 0)), 110);
-}
-$("pad").addEventListener("pointerdown", e => { e.preventDefault(); flash(); });
-
-let metroTimer = 0;
-$("bpm").oninput = e => { $("bpmV").textContent = e.target.value; if (metroTimer) { stopMetro(); startMetro(); } };
-function startMetro() { metroTimer = setInterval(flash, 60000 / +$("bpm").value); $("metro").textContent = "עצור מטרונום"; }
-function stopMetro() { clearInterval(metroTimer); metroTimer = 0; $("metro").textContent = "הפעל מטרונום"; }
-$("metro").onclick = () => metroTimer ? stopMetro() : startMetro();
+// ---- quick controls ----
+const fmt = () => $("fmt").value;
+$("fmt").value = colorFormat();
+$("fmt").onchange = () => setColorFormat(fmt());
+$("on").onclick = () => strip.send(frames.on());
+$("off").onclick = () => strip.send(frames.off());
+const COLORS = [["אדום", 255, 0, 0], ["כתום", 255, 110, 0], ["צהוב", 255, 210, 0], ["ירוק", 0, 255, 60], ["תכלת", 0, 220, 255], ["כחול", 0, 60, 255], ["סגול", 170, 0, 255], ["לבן", 255, 255, 255]];
+$("swatches").innerHTML = COLORS.map(([n, r, g, b], i) =>
+  `<button class="sw" data-needs data-c="${i}" style="background:rgb(${r},${g},${b})" aria-label="${n}" title="${n}"></button>`).join("");
+document.querySelectorAll("[data-c]").forEach(el => el.onclick = () => { const [, r, g, b] = COLORS[+el.dataset.c]; strip.send(frames.rgb(r, g, b, fmt())); });
+let fx = 0;
+const setFx = d => { fx = (fx + d + 256) % 256; $("fxV").textContent = fx; strip.send(frames.fx(fx)); };
+$("fxPrev").onclick = () => setFx(-1);
+$("fxNext").onclick = () => setFx(1);
+$("bri").oninput = e => { $("briV").textContent = e.target.value; strip.sendLatest(frames.bri(+e.target.value)); };
+$("spd").oninput = e => { $("spdV").textContent = e.target.value; strip.sendLatest(frames.spd(+e.target.value)); };
+setConnected(strip.connected, strip.connected ? "מחובר" : "לא מחובר");
 </script>
 </body>
 </html>
