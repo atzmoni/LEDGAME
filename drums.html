@@ -21,13 +21,18 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--display); }
-main { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: calc(12px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
+main { max-width: 1200px; margin: 0 auto; padding-inline: 16px; padding-block: calc(12px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
 header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 h1 { margin: 0; font-weight: 800; font-size: 1.4rem; }
 a { color: var(--accent); }
-.pads { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.pad { aspect-ratio: 1; border-radius: 16px; border: 2px solid var(--pc); background: color-mix(in srgb, var(--pc) 14%, var(--panel)); color: var(--fg); font: 800 1.15rem var(--display); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: transform .06s, background .25s; padding: 0; }
-.pad small { display: block; font: 400 .75rem var(--mono); color: var(--muted); }
+.pads { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; direction: ltr; }
+@media (orientation: landscape) { .pads { grid-template-columns: repeat(16, 1fr); } }
+@media (min-width: 600px) { .pad { font-size: .78rem; } }
+.pad { aspect-ratio: 1; border-radius: 10px; border: 2px solid var(--pc); background: color-mix(in srgb, var(--pc) 22%, var(--panel)); color: var(--fg); font: 800 .6rem var(--display); min-width: 0; overflow: hidden; white-space: nowrap; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: transform .06s, background .25s; padding: 0; }
+.pad small { display: block; font: 400 .62rem var(--mono); color: var(--muted); }
+.flow { display: grid; gap: 8px; }
+.flow canvas { width: 100%; height: 120px; display: block; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+.flow .row output { font: 600 1rem var(--mono); color: var(--accent); min-width: 3ch; }
 .pad.hit { background: var(--pc); color: #0d1117; transform: scale(.96); transition: none; }
 .pad.hit small { color: #0d1117; }
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 10px; }
@@ -36,6 +41,7 @@ h2 { margin: 0; font-size: .78rem; font-weight: 600; text-transform: uppercase; 
 button.b { font: 600 1rem var(--display); color: var(--fg); background: #1f2734; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button.primary { background: var(--accent); color: #062a24; border-color: transparent; }
+button.primary[aria-pressed="true"] { background: var(--bad); color: #fff; }
 button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 label { display: grid; gap: 4px; font-size: .9rem; color: var(--muted); flex: 1 1 180px; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
@@ -63,6 +69,18 @@ select { font: 1rem var(--display); background: var(--bg); color: var(--fg); bor
   </div>
 
   <div class="pads" id="pads"></div>
+
+  <section class="flow">
+    <h2>זרימת ביטים</h2>
+    <canvas id="lane" aria-label="הביטים זורמים לעבר הקו ומתנגנים כשהם פוגשים אותו"></canvas>
+    <div class="row">
+      <button class="b primary" id="loopBtn" aria-pressed="false">הפעל לופ</button>
+      <button class="b" id="clearBtn">נקה</button>
+      <label>קצב <input type="range" id="bpm" min="60" max="160" value="100"></label>
+      <output id="bpmOut">100</output>
+    </div>
+    <p class="help">לחץ "הפעל לופ" ונגן על הפדים. כל מכה נשמרת בלופ, זורמת לעבר הקו, ומתנגנת שוב בכל סיבוב עם האור בחבל.</p>
+  </section>
 
   <section>
     <h2>מה קורה בפס בכל מכה</h2>
@@ -99,7 +117,7 @@ select { font: 1rem var(--display); background: var(--bg); color: var(--fg); bor
 </main>
 
 <script type="module">
-import { sharedStrip, frames, colorFormat } from "./led.js?v=7";
+import { sharedStrip, frames, colorFormat, hueToRgb } from "./led.js?v=8";
 
 const $ = id => document.getElementById(id);
 const strip = sharedStrip();
@@ -126,23 +144,24 @@ function hiss(a, type, freq, decay, peak = 0.6, delay = 0) {
   const t = a.currentTime + delay, n = noise(a), f = a.createBiquadFilter(); f.type = type; f.frequency.value = freq;
   n.connect(f); env(a, f, peak, decay, t); n.start(t); n.stop(t + decay + 0.05);
 }
-const SOUNDS = {
-  kick:  a => tone(a, 150, 45, 0.45),
-  snare: a => { hiss(a, "highpass", 1200, 0.2, 0.5); tone(a, 220, 160, 0.12, "triangle", 0.4); },
-  hat:   a => hiss(a, "highpass", 7500, 0.06, 0.35),
-  clap:  a => { [0, 0.012, 0.025].forEach(d => hiss(a, "bandpass", 1500, 0.12, 0.7, d)); },
-  tom:   a => tone(a, 210, 110, 0.3, "sine", 0.8),
-  crash: a => hiss(a, "highpass", 4500, 1.2, 0.35),
-};
-
-const PADS = [
-  { id: "kick",  name: "בס",     rgb: [255, 0, 0],     key: "תוף בס" },
-  { id: "snare", name: "סנר",    rgb: [0, 90, 255],    key: "תוף צד" },
-  { id: "hat",   name: "היי-האט", rgb: [255, 210, 0],  key: "מצילה סגורה" },
-  { id: "clap",  name: "מחיאה",  rgb: [255, 255, 255], key: "כפיים" },
-  { id: "tom",   name: "טום",    rgb: [0, 255, 60],    key: "תוף טום" },
-  { id: "crash", name: "קראש",   rgb: [200, 0, 255],   key: "מצילה" },
+// 64 instruments: 8 families x 8 pitches, laid out in rainbow order.
+const SCALE = [0, 2, 4, 7, 9, 12, 14, 16];   // pentatonic, so any two pads sound good together
+const note = (base, p) => base * 2 ** (SCALE[p] / 12);
+const FAMILIES = [
+  { name: "בס",     play: (a, p) => tone(a, 120 + p * 14, 40 + p * 6, 0.45 - p * 0.02) },
+  { name: "טום",    play: (a, p) => tone(a, 90 + p * 32, (90 + p * 32) * 0.55, 0.32) },
+  { name: "סנר",    play: (a, p) => { hiss(a, "highpass", 800 + p * 220, 0.18, 0.5); tone(a, 170 + p * 22, 130 + p * 18, 0.1, "triangle", 0.4); } },
+  { name: "מחיאה",  play: (a, p) => [0, 0.012, 0.025].forEach(d => hiss(a, "bandpass", 900 + p * 260, 0.12, 0.7, d)) },
+  { name: "היי-האט", play: (a, p) => hiss(a, "highpass", 5000 + p * 600, 0.04 + p * 0.03, 0.35) },
+  { name: "מצילה",  play: (a, p) => hiss(a, "highpass", 3000 + p * 500, 0.5 + p * 0.15, 0.3) },
+  { name: "פעמון",  play: (a, p) => { tone(a, note(440, p), note(440, p), 0.7, "sine", 0.5); tone(a, note(880, p) * 1.5, note(880, p) * 1.5, 0.25, "sine", 0.15); } },
+  { name: "סינט",  play: (a, p) => tone(a, note(110, p), note(110, p) * 0.98, 0.3, "square", 0.25) },
 ];
+
+const PADS = Array.from({ length: 64 }, (_, i) => {
+  const f = FAMILIES[i >> 3], p = i & 7;
+  return { id: i, name: f.name, key: String(p + 1), rgb: hueToRgb(i * 330 / 63), play: a => f.play(a, p) };
+});
 
 // ---- light per hit ----
 let style = "color";
@@ -166,11 +185,15 @@ async function light(rgb, strength = 1) {
   }
 }
 
-function hit(pad, strength = 1) {
-  SOUNDS[pad.id](audio());
-  light(pad.rgb, strength);
+function flash(pad) {
   const el = document.querySelector(`[data-pad="${pad.id}"]`);
   el.classList.add("hit"); setTimeout(() => el.classList.remove("hit"), 110);
+}
+function hit(pad, strength = 1) {
+  pad.play(audio());
+  light(pad.rgb, strength);
+  flash(pad);
+  record(pad);
 }
 
 $("pads").innerHTML = PADS.map(p =>
@@ -189,10 +212,10 @@ function onHit(strength) {
   const now = performance.now();
   if (now - lastOnset < 120) return;
   lastOnset = now;
-  const pad = PADS[nextPad++ % PADS.length];
+  const pad = PADS[(nextPad++ * 8) % PADS.length];   // walk the rainbow in big steps so knocks change colour visibly
   light(pad.rgb, strength);
-  const el = document.querySelector(`[data-pad="${pad.id}"]`);
-  el.classList.add("hit"); setTimeout(() => el.classList.remove("hit"), 110);
+  flash(pad);
+  record(pad);
   $("hits").textContent = `זוהו ${++hits} מכות`;
 }
 const sens = () => +$("sens").value / 100;
@@ -241,6 +264,75 @@ $("motionBtn").onclick = async () => {
     lastAcc = { x: g.x, y: g.y, z: g.z };
   });
 };
+
+// ---- beat flow: a 2-bar loop of 32 steps; taps are recorded at the nearest step ----
+const STEPS = 32;
+let loopOn = false, loopStart = 0, lastStep = -1, notes = [];   // notes: { step, pad }
+const stepMs = () => 60000 / +$("bpm").value / 4;
+const loopMs = () => stepMs() * STEPS;
+function record(pad) {
+  if (!loopOn) return;
+  const step = Math.round((performance.now() - loopStart) / stepMs()) % STEPS;
+  // A tap rounded up to the coming step was already heard live, so that step skips it once.
+  const ahead = step !== ((lastStep % STEPS) + STEPS) % STEPS;
+  if (!notes.some(n => n.step === step && n.pad === pad)) notes.push({ step, pad, fresh: ahead });
+}
+$("loopBtn").onclick = () => {
+  audio();
+  loopOn = !loopOn;
+  $("loopBtn").textContent = loopOn ? "עצור לופ" : "הפעל לופ";
+  $("loopBtn").setAttribute("aria-pressed", loopOn);
+  loopStart = performance.now(); lastStep = -1;
+};
+$("clearBtn").onclick = () => { notes = []; };
+$("bpm").oninput = () => {
+  // keep the playhead where it is when the tempo changes
+  const pos = loopOn ? ((performance.now() - loopStart) % loopMs()) / loopMs() : 0;
+  $("bpmOut").textContent = $("bpm").value;
+  loopStart = performance.now() - pos * loopMs();
+};
+
+const lane = $("lane"), g = lane.getContext("2d");
+function tick() {
+  const now = performance.now();
+  const w = lane.clientWidth, h = lane.clientHeight, dpr = devicePixelRatio || 1;
+  if (lane.width !== w * dpr) { lane.width = w * dpr; lane.height = h * dpr; }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const hitX = w * 0.12, pxPerMs = (w - hitX) / loopMs();
+  const elapsed = loopOn ? (now - loopStart) % loopMs() : 0;
+
+  // play the steps the playhead just crossed
+  if (loopOn) {
+    const step = Math.floor((now - loopStart) / stepMs());
+    if (step !== lastStep) {
+      lastStep = step;
+      const due = notes.filter(n => n.step === step % STEPS);
+      due.forEach(n => { if (n.fresh) { n.fresh = false; return; } n.pad.play(audio()); flash(n.pad); });
+      const shown = due.filter(n => !n.fresh).pop();
+      if (shown) light(shown.pad.rgb, 0.8);
+    }
+  }
+
+  // beat grid
+  for (let s = 0; s < STEPS; s++) {
+    let t = s * stepMs() - elapsed; if (t < 0) t += loopMs();
+    const x = hitX + t * pxPerMs;
+    g.fillStyle = s % 4 === 0 ? "#263041" : "#161c25";
+    g.fillRect(x, 0, s % 4 === 0 ? 2 : 1, h);
+  }
+  // notes flow toward the line; each family has its own lane
+  for (const n of notes) {
+    let t = n.step * stepMs() - elapsed; if (t < 0) t += loopMs();
+    const x = hitX + t * pxPerMs, y = 8 + ((n.pad.id >> 3) + 0.5) * (h - 16) / 8;
+    const near = Math.max(0, 1 - t / 120);
+    g.fillStyle = `rgb(${n.pad.rgb.join(",")})`;
+    g.beginPath(); g.arc(x, y, 5 + near * 5, 0, Math.PI * 2); g.fill();
+  }
+  g.fillStyle = "#e6ebf2"; g.fillRect(hitX - 1, 0, 3, h);
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
 
 // ---- controller's own microphone ----
 $("ctrlMicOn").onclick = async () => {
