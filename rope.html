@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Burning Rope</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: the rope (drawn as wrapped rows of LEDs) is the board; players sit below it like seats around a table. Single dark look. */
+:root {
+  --bg: #0d1117;
+  --panel: #161c25;
+  --line: #263041;
+  --fg: #e6ebf2;
+  --muted: #8592a6;
+  --accent: #35d0ba;
+  --burn: #ff5a36;
+  --display: "Heebo", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--display); }
+main { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: calc(12px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+h1 { margin: 0; font-weight: 800; font-size: 1.5rem; }
+a { color: var(--accent); }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 10px; }
+h2 { margin: 0; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+canvas { width: 100%; display: block; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: 600 1rem var(--display); color: var(--fg); background: #1f2734; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: #062a24; border-color: transparent; }
+button.go { width: 100%; font-size: 1.5rem; font-weight: 800; padding: 18px; background: var(--burn); color: #fff; border: 0; }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: .45; }
+label { display: grid; gap: 2px; font-size: .85rem; color: var(--muted); }
+input[type=number] { font: 1rem var(--mono); background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; width: 5.5em; }
+.status { font: .85rem var(--mono); padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); }
+.status.on { color: var(--accent); border-color: var(--accent); }
+.status.err { color: #ef6461; border-color: #ef6461; }
+.msg { font-size: 1.25rem; font-weight: 800; text-align: center; min-height: 1.9em; margin: 0; }
+.players { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.player { border: 2px solid var(--pc); border-radius: 10px; padding: 8px 10px; display: grid; gap: 6px; }
+.player.out { opacity: .35; }
+.player b { color: var(--pc); }
+.hands { display: flex; gap: 6px; align-items: center; justify-content: space-between; }
+.hands span { font-size: 1.4rem; letter-spacing: 2px; }
+.hands button { padding: 4px 12px; }
+.note { color: var(--muted); font-size: .85rem; margin: 0; }
+.rules { color: var(--muted); font-size: .9rem; margin: 0; padding-inline-start: 1.2em; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>חבל נשרף</h1>
+    <a href="./">לדף הבדיקה</a>
+  </header>
+
+  <section>
+    <canvas id="rope" aria-label="החבל"></canvas>
+    <p class="msg" id="msg">כולם תופסים את החבל. לחצו "סובב".</p>
+    <button class="go" id="spin">סובב</button>
+  </section>
+
+  <section>
+    <h2>מצב משחק</h2>
+    <div class="row" role="group" aria-label="מצב">
+      <button data-mode="burn" aria-pressed="true">חבל נשרף</button>
+      <button data-mode="lucky" aria-pressed="false">מי הכי קרוב</button>
+    </div>
+    <ol class="rules" id="rules"></ol>
+  </section>
+
+  <section>
+    <h2>שחקנים</h2>
+    <div class="players" id="players"></div>
+    <div class="row">
+      <label>שחקנים <input type="number" id="nPlayers" min="2" max="6" value="3"></label>
+      <label>לדים בחבל <input type="number" id="nLeds" min="20" max="300" value="80"></label>
+      <label>גודל שריפה <input type="number" id="burnSize" min="1" max="30" value="6"></label>
+      <button id="reset">משחק חדש</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>הפס</h2>
+    <div class="row">
+      <button class="primary" id="connect">התחבר לפס</button>
+      <span class="status" id="status">לא מחובר</span>
+    </div>
+    <p class="note">הבקר הנוכחי לא יודע להדליק לד בודד, אז המיקום המדויק מוצג על המסך והפס נותן רק אפקטי אור: הבהוב בזמן הסיבוב, ואדום או ירוק כשהאור נעצר.</p>
+  </section>
+</main>
+
+<script type="module">
+import { Strip, frames, colorFormat } from "./led.js";
+
+const $ = id => document.getElementById(id);
+const strip = new Strip();
+const fmt = colorFormat();
+const PLAYER_COLORS = [["כחול", "#4c8dff"], ["צהוב", "#ffd23f"], ["ירוק", "#5ad17a"], ["סגול", "#b76bff"], ["כתום", "#ff9b3d"], ["ורוד", "#ff6fb5"]];
+const RULES = {
+  burn: [
+    "כל שחקן תופס את החבל בשתי ידיים, איפה שהוא רוצה.",
+    "לוחצים \"סובב\". האור רץ ונעצר במקום אקראי, והאזור סביבו נשרף.",
+    "מי שיד שלו בתוך האזור השרוף מאבד את היד (לחצו − ליד השם שלו).",
+    "אסור לתפוס על מקום שרוף. אחרי כל סיבוב מי שצריך מחליף מקום.",
+    "מי שנשאר בלי ידיים בחוץ. האחרון שנשאר זוכה, או שהחבל נשרף כולו.",
+  ],
+  lucky: [
+    "כל שחקן תופס את החבל בנקודה אחת.",
+    "לוחצים \"סובב\" והאור נעצר במקום אקראי.",
+    "היד הכי קרובה לנקודה זוכה בסיבוב (לחצו + ליד השם שלו).",
+  ],
+};
+
+let mode = "burn";
+let N = 80;
+let burned = new Uint8Array(N);
+let dot = -1, flash = null, spinning = false;
+let players = [];
+
+// ---- drawing the rope as wrapped rows of LEDs ----
+const cv = $("rope"), ctx = cv.getContext("2d");
+function layout() {
+  const w = cv.clientWidth, perRow = Math.min(20, N);
+  const cell = w / perRow, rows = Math.ceil(N / perRow);
+  cv.width = w * devicePixelRatio; cv.height = (rows * cell + 8) * devicePixelRatio;
+  cv.style.height = rows * cell + 8 + "px";
+  return { perRow, cell };
+}
+function draw() {
+  const { perRow, cell } = layout();
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  for (let i = 0; i < N; i++) {
+    const r = Math.floor(i / perRow);
+    // Snake the rows so the rope reads as one continuous line, starting at the right (RTL).
+    const c = r % 2 === 0 ? perRow - 1 - (i % perRow) : i % perRow;
+    const x = c * cell + cell / 2, y = r * cell + cell / 2 + 4;
+    let col = "#222b38";
+    if (burned[i]) col = "#7a2414";
+    if (flash && flash.from <= i && i <= flash.to) col = flash.color;
+    if (i === dot) col = spinning ? "#ffffff" : (mode === "burn" ? "#ff5a36" : "#35d0ba");
+    ctx.beginPath(); ctx.arc(x, y, cell * 0.36, 0, 7); ctx.fillStyle = col; ctx.fill();
+    if (i === dot) { ctx.shadowColor = col; ctx.shadowBlur = 16; ctx.fill(); ctx.shadowBlur = 0; }
+    if ((i + 1) % 10 === 0) {
+      ctx.fillStyle = "#8592a6"; ctx.font = `${Math.max(8, cell * 0.3)}px JetBrains Mono, monospace`;
+      ctx.textAlign = "center"; ctx.fillText(String(i + 1), x, y + cell * 0.62);
+    }
+  }
+}
+addEventListener("resize", draw);
+
+// ---- sound: a tick per step, slowing like a wheel ----
+let audio = null;
+function tick(freq = 880, dur = 0.03) {
+  try {
+    audio ||= new AudioContext();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = freq; g.gain.value = 0.08;
+    o.connect(g).connect(audio.destination);
+    o.start(); o.stop(audio.currentTime + dur);
+  } catch {}
+}
+
+// ---- the spin ----
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function spin() {
+  const free = [...burned.keys()].filter(i => !burned[i]);
+  if (spinning || !free.length) return;
+  spinning = true; $("spin").disabled = true; flash = null;
+  $("msg").textContent = "…";
+  const target = free[Math.floor(Math.random() * free.length)];
+  // Run 2-3 laps, then land on the target, slowing down as it goes.
+  const start = dot < 0 ? 0 : dot;
+  const steps = (1 + Math.floor(Math.random() * 2)) * N + ((target - start + N) % N);
+  const duration = 4000 + Math.random() * 1500;
+  const t0 = performance.now();
+  let s = 0;
+  while (s < steps) {
+    await new Promise(requestAnimationFrame);
+    const p = Math.min(1, (performance.now() - t0) / duration);
+    const next = Math.round(steps * (1 - Math.pow(1 - p, 4)));   // ease-out: fast start, slow finish
+    if (next === s) continue;
+    s = next;
+    dot = (start + s) % N;
+    draw();
+    tick(burned[dot] ? 300 : 900);
+    if (strip.connected) strip.sendLatest(s % 2 ? frames.rgb(255, 255, 255, fmt) : frames.rgb(20, 20, 20, fmt));
+  }
+  spinning = false;
+  land(target);
+}
+
+async function land(i) {
+  tick(440, 0.25);
+  if (mode === "lucky") {
+    $("msg").textContent = `האור נעצר בלד ${i + 1}. היד הכי קרובה זוכה!`;
+    draw();
+    await stripFlash([0, 255, 80], 3);
+  } else {
+    const half = Math.floor(+$("burnSize").value / 2);
+    const from = Math.max(0, i - half), to = Math.min(N - 1, i + half);
+    flash = { from, to, color: "#ff5a36" };
+    for (let k = from; k <= to; k++) burned[k] = 1;
+    draw();
+    const left = burned.reduce((a, b) => a + (1 - b), 0);
+    $("msg").textContent = left
+      ? `נשרף מלד ${from + 1} עד ${to + 1}. מי שתופס שם מאבד יד!`
+      : "כל החבל נשרף! המשחק נגמר.";
+    await stripFlash([255, 30, 0], 3);
+  }
+  $("spin").disabled = false;
+}
+
+async function stripFlash([r, g, b], times) {
+  if (!strip.connected) return;
+  for (let k = 0; k < times; k++) {
+    await strip.send(frames.rgb(r, g, b, fmt)); await sleep(180);
+    await strip.send(frames.rgb(0, 0, 0, fmt)); await sleep(140);
+  }
+  await strip.send(frames.rgb(r, g, b, fmt));
+}
+
+// ---- players ----
+function renderPlayers() {
+  const box = $("players"); box.innerHTML = "";
+  players.forEach((p, idx) => {
+    const el = document.createElement("div");
+    el.className = "player" + (mode === "burn" && p.hands === 0 ? " out" : "");
+    el.style.setProperty("--pc", p.color);
+    const val = mode === "burn" ? "✋".repeat(p.hands) || "בחוץ" : `${p.wins} נצחונות`;
+    el.innerHTML = `<b>${p.name}</b><div class="hands"><span>${val}</span>
+      <button aria-label="${mode === "burn" ? "הורד יד" : "הוסף נצחון"} ל${p.name}">${mode === "burn" ? "−" : "+"}</button></div>`;
+    el.querySelector("button").onclick = () => {
+      if (mode === "burn") p.hands = Math.max(0, p.hands - 1); else p.wins++;
+      renderPlayers(); checkWinner();
+    };
+    box.appendChild(el);
+  });
+}
+function checkWinner() {
+  if (mode !== "burn") return;
+  const alive = players.filter(p => p.hands > 0);
+  if (alive.length === 1) { $("msg").textContent = `${alive[0].name} ניצח!`; stripFlash([0, 255, 80], 4); }
+}
+function reset() {
+  N = Math.min(300, Math.max(20, +$("nLeds").value || 80));
+  burned = new Uint8Array(N); dot = -1; flash = null;
+  const n = Math.min(6, Math.max(2, +$("nPlayers").value || 3));
+  players = PLAYER_COLORS.slice(0, n).map(([name, color]) => ({ name, color, hands: 2, wins: 0 }));
+  $("rules").innerHTML = RULES[mode].map(r => `<li>${r}</li>`).join("");
+  $("msg").textContent = "כולם תופסים את החבל. לחצו \"סובב\".";
+  $("spin").disabled = false;
+  renderPlayers(); draw();
+}
+
+document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => {
+  mode = b.dataset.mode;
+  document.querySelectorAll("[data-mode]").forEach(x => x.setAttribute("aria-pressed", x === b));
+  reset();
+});
+$("spin").onclick = spin;
+$("reset").onclick = reset;
+["nPlayers", "nLeds"].forEach(id => $(id).onchange = reset);
+
+$("connect").onclick = async () => {
+  try {
+    $("status").textContent = "מחפש…";
+    const name = await strip.connect();
+    await strip.send(frames.on());
+    $("status").textContent = "מחובר: " + name; $("status").className = "status on";
+  } catch { $("status").textContent = "לא מחובר"; $("status").className = "status err"; }
+};
+strip.addEventListener("disconnect", () => { $("status").textContent = "התנתק"; $("status").className = "status err"; });
+
+reset();
+</script>
+</body>
+</html>
