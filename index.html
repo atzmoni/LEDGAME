@@ -81,6 +81,7 @@ select { font: .95rem var(--display); background: var(--bg); color: var(--fg); b
     <button role="tab" data-tab="home" aria-selected="true">בית</button>
     <button role="tab" data-tab="hand" aria-selected="false">יד ומצלמה</button>
     <button role="tab" data-tab="gestures" aria-selected="false">מחוות</button>
+    <button role="tab" data-tab="face" aria-selected="false">פנים</button>
     <button role="tab" data-tab="drums" aria-selected="false">מתופף</button>
     <button role="tab" data-tab="magic" aria-selected="false">קסמים</button>
     <button role="tab" data-tab="rope" aria-selected="false">חבל נשרף<small>בפיתוח</small></button>
@@ -145,12 +146,12 @@ addEventListener("error", e => showError(e.error || e.message));
 addEventListener("unhandledrejection", e => showError(e.reason));
 </script>
 <script type="module">
-import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js?v=10";
+import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js?v=11";
 
 const $ = id => document.getElementById(id);
 const strip = sharedStrip();   // also published as window.ledgameStrip for the tabs
-const V = "?v=10";   // bump on every release so phones don't mix a cached old file with a new one
-const PAGES = { hand: "camera.html" + V, gestures: "gestures.html" + V, drums: "drums.html" + V, magic: "magic.html" + V, rope: "rope.html" + V };
+const V = "?v=11";   // bump on every release so phones don't mix a cached old file with a new one
+const PAGES = { hand: "camera.html" + V, gestures: "gestures.html" + V, face: "face.html" + V, drums: "drums.html" + V, magic: "magic.html" + V, rope: "rope.html" + V };
 
 // ---- connection ----
 function setConnected(on, text) {
