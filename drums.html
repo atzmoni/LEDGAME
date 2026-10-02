@@ -76,10 +76,11 @@ select { font: 1rem var(--display); background: var(--bg); color: var(--fg); bor
     <h2>תיפוף על השולחן</h2>
     <div class="row">
       <button class="b" id="micBtn">הפעל מיקרופון</button>
+      <button class="b" id="motionBtn">נקישות על הטלפון</button>
       <label>רגישות <input type="range" id="sens" min="1" max="100" value="60"></label>
     </div>
     <div class="level" aria-hidden="true"><i id="lvl"></i><b id="thr"></b></div>
-    <p class="help">הנח את הטלפון על השולחן ותופף לידו או מחא כפיים. כל מכה מהבהבת בצבע הבא.</p>
+    <p class="help"><b id="hits">זוהו 0 מכות</b>. מיקרופון: תופפו ליד הטלפון או מחאו כפיים, והפס הלבן מראה כמה חזק נשמע. נקישות על הטלפון: הניחו אותו על השולחן ודפקו על השולחן או על הטלפון. אם לא מזוהה, הגבירו רגישות.</p>
   </section>
 
   <section>
@@ -181,14 +182,29 @@ document.querySelectorAll("[data-style]").forEach(b => b.onclick = () => {
   $("styleHelp").textContent = HELP[style];
 });
 
-// ---- microphone: knock and clap detection ----
-let micOn = false, analyser = null, buf = null, avg = 0.01, lastOnset = 0, nextPad = 0;
+// ---- knock detection: phone microphone and the phone's own motion sensor ----
+let lastOnset = 0, nextPad = 0, hits = 0;
+function onHit(strength) {
+  const now = performance.now();
+  if (now - lastOnset < 120) return;
+  lastOnset = now;
+  const pad = PADS[nextPad++ % PADS.length];
+  light(pad.rgb, strength);
+  const el = document.querySelector(`[data-pad="${pad.id}"]`);
+  el.classList.add("hit"); setTimeout(() => el.classList.remove("hit"), 110);
+  $("hits").textContent = `זוהו ${++hits} מכות`;
+}
+const sens = () => +$("sens").value / 100;
+
+let micOn = false, analyser = null, buf = null, avg = 0.005;
 $("micBtn").onclick = async () => {
   if (micOn) return;
+  const a = audio();   // create inside the tap, before any await, so Chrome lets it run
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-    const a = audio();
-    analyser = a.createAnalyser(); analyser.fftSize = 512;
+    await a.resume();
+    // 2048 samples (~45 ms) is longer than one animation frame, so no knock falls between two reads.
+    analyser = a.createAnalyser(); analyser.fftSize = 2048;
     a.createMediaStreamSource(stream).connect(analyser);
     buf = new Float32Array(analyser.fftSize);
     micOn = true; $("micBtn").textContent = "המיקרופון פועל"; $("micBtn").setAttribute("aria-pressed", "true");
@@ -198,23 +214,32 @@ $("micBtn").onclick = async () => {
 function listen() {
   analyser.getFloatTimeDomainData(buf);
   let peak = 0; for (const v of buf) peak = Math.max(peak, Math.abs(v));
-  const now = performance.now();
-  // Onset: a peak well above the running background level, at most ~8 per second.
-  const sens = +$("sens").value / 100;
-  const ratio = 6 - 4.5 * sens, minPeak = 0.25 - 0.22 * sens;
-  const thr = Math.max(minPeak, avg * ratio);
-  if (peak > thr && now - lastOnset > 120) {
-    lastOnset = now;
-    const pad = PADS[nextPad++ % PADS.length];
-    light(pad.rgb, Math.min(1, peak / (thr * 2)));
-    const el = document.querySelector(`[data-pad="${pad.id}"]`);
-    el.classList.add("hit"); setTimeout(() => el.classList.remove("hit"), 110);
-  }
-  avg = avg * 0.95 + peak * 0.05;
-  $("lvl").style.width = Math.min(100, peak * 200) + "%";
-  $("thr").style.insetInlineStart = Math.min(100, thr * 200) + "%";
+  // A knock is a peak well above the background level.
+  const s = sens();
+  const thr = Math.max(0.12 - 0.115 * s, avg * (4 - 2.6 * s));
+  if (peak > thr) onHit(Math.min(1, peak / (thr * 3)));
+  avg = avg * 0.97 + peak * 0.03;
+  $("lvl").style.width = Math.min(100, peak * 300) + "%";
+  $("thr").style.insetInlineStart = Math.min(100, thr * 300) + "%";
   requestAnimationFrame(listen);
 }
+
+// Knocking on the phone itself, or on the table it lies on, shows up as a jolt in the accelerometer.
+let motionOn = false, lastAcc = null;
+$("motionBtn").onclick = async () => {
+  if (motionOn) return;
+  try { if (typeof DeviceMotionEvent?.requestPermission === "function") await DeviceMotionEvent.requestPermission(); } catch {}
+  motionOn = true; $("motionBtn").textContent = "חיישן התנועה פועל"; $("motionBtn").setAttribute("aria-pressed", "true");
+  addEventListener("devicemotion", e => {
+    const g = e.accelerationIncludingGravity; if (!g || g.x == null) return;
+    if (lastAcc) {
+      const jolt = Math.hypot(g.x - lastAcc.x, g.y - lastAcc.y, g.z - lastAcc.z);
+      const thr = 3.2 - 2.9 * sens();
+      if (jolt > thr) onHit(Math.min(1, jolt / (thr * 3)));
+    }
+    lastAcc = { x: g.x, y: g.y, z: g.z };
+  });
+};
 
 // ---- controller's own microphone ----
 $("ctrlMicOn").onclick = async () => {
