@@ -98,10 +98,12 @@ input[type=number] { font: 1rem var(--mono); background: var(--bg); color: var(-
       <span class="status" id="status">לא מחובר</span>
     </div>
     <div class="row">
-      <label>מספר אפקט הסורק (כמו באפליקציה) <input type="number" id="fxNum" min="1" max="255" value="1"></label>
-      <button id="fxTest">נסה אפקט</button>
+      <button id="fxPrev" aria-label="אפקט קודם">−</button>
+      <label>אפקט הסורק בבקר <input type="number" id="fxNum" min="0" max="255" value="89"></label>
+      <button id="fxNext" aria-label="אפקט הבא">+</button>
+      <button id="fxTest">נסה</button>
     </div>
-    <p class="note">כשהפס מחובר, הסורק רץ על החבל עצמו בעזרת אפקט מובנה של הבקר, ועוצר כשהמהירות יורדת לאפס. בחר באפליקציית duoCo אפקט של נקודה אחת שרצה, ורשום כאן את המספר שלו. הבקר לא יודע לכבות לד בודד, אז את המקומות השרופים זוכרים בעצמכם.</p>
+    <p class="note">כשהפס מחובר, הסורק רץ על החבל עצמו בעזרת אפקט מובנה של הבקר, ועוצר כשהמהירות יורדת לאפס. לחץ + ו− והסתכל על החבל עד שרואים נקודה אחת שרצה. המספר נשמר. הבקר לא יודע לכבות לד בודד, אז את המקומות השרופים זוכרים בעצמכם.</p>
   </section>
 </main>
 
@@ -212,8 +214,7 @@ async function stripSpin() {
   if (spinning) return;
   spinning = true; $("spin").disabled = true;
   $("msg").textContent = "הסורק רץ…";
-  const fx = Math.max(1, +$("fxNum").value || 1);
-  await strip.send(frames.fx(fx - 1));
+  await strip.send(frames.fx(scanFx()));
   await strip.send(frames.spd(100));
   const runFor = 2500 + Math.random() * 3500;
   const t0 = performance.now();
@@ -328,11 +329,17 @@ strip.addEventListener("disconnect", () => {
   $("status").textContent = "התנתק"; $("status").className = "status err";
   $("rope").hidden = false; $("stripMode").hidden = true;
 });
-try { $("fxNum").value = localStorage.getItem("ledgame.scanFx") || 1; } catch {}
-$("fxNum").onchange = e => { try { localStorage.setItem("ledgame.scanFx", e.target.value); } catch {} };
+// The app numbers effects per tab, so the scanner is picked by the controller's own id, browsing live on the rope.
+const scanFx = () => Math.min(255, Math.max(0, Math.round(+$("fxNum").value || 0)));
+try { $("fxNum").value = localStorage.getItem("ledgame.scanFx.v2") || 89; } catch {}
+function saveFx() { try { localStorage.setItem("ledgame.scanFx.v2", scanFx()); } catch {} }
+function stepFx(d) { $("fxNum").value = Math.min(255, Math.max(0, scanFx() + d)); saveFx(); $("fxTest").click(); }
+$("fxPrev").onclick = () => stepFx(-1);
+$("fxNext").onclick = () => stepFx(1);
+$("fxNum").onchange = saveFx;
 $("fxTest").onclick = async () => {
   if (!strip.connected) return;
-  await strip.send(frames.fx(Math.max(1, +$("fxNum").value || 1) - 1));
+  await strip.send(frames.fx(scanFx()));
   await strip.send(frames.spd(60));
 };
 
