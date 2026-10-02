@@ -54,6 +54,8 @@ input[type=number], select { font: 1rem var(--mono); background: var(--bg); colo
     <p class="sub">דף בדיקה לבקר duoCo StripX (MELK-OA10). סגור את אפליקציית duoCo לפני החיבור, הבקר מקבל רק טלפון אחד.</p>
   </header>
 
+  <a class="sub" href="camera.html" style="color:var(--accent)">שליטה ביד דרך המצלמה ←</a>
+
   <p class="note" id="nobt" hidden>הדפדפן הזה לא תומך ב-Web Bluetooth. פתח את הדף ב-Chrome באנדרואיד.</p>
 
   <section>
@@ -108,6 +110,10 @@ input[type=number], select { font: 1rem var(--mono); background: var(--bg); colo
 </main>
 
 <script>
+// Remember the colour format so the camera page uses the one that works.
+try { $id("fmt").value = localStorage.getItem("ledgame.fmt") || "a"; } catch {}
+$id("fmt").addEventListener("change", e => { try { localStorage.setItem("ledgame.fmt", e.target.value); } catch {} });
+function $id(id) { return document.getElementById(id); }
 const SERVICE = 0xfff0, WRITE = 0xfff3;
 let dev = null, ch = null, queue = Promise.resolve();
 const $ = id => document.getElementById(id);
