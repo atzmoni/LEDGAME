@@ -79,6 +79,7 @@ select { font: .95rem var(--display); background: var(--bg); color: var(--fg); b
   <div class="rope" id="ropeLine" aria-hidden="true"></div>
   <nav role="tablist" aria-label="מסכים" id="tabs">
     <button role="tab" data-tab="home" aria-selected="true">בית</button>
+    <button role="tab" data-tab="calib" aria-selected="false">כיול</button>
     <button role="tab" data-tab="hand" aria-selected="false">יד ומצלמה</button>
     <button role="tab" data-tab="gestures" aria-selected="false">מחוות</button>
     <button role="tab" data-tab="drums" aria-selected="false">מתופף</button>
@@ -101,6 +102,7 @@ select { font: .95rem var(--display); background: var(--bg); color: var(--fg); b
       </div>
 
       <div class="cards" id="cards">
+        <button class="card" data-go="calib"><b>כיול</b><span>כמה לדים יש בחבל וכמה לדים במטר</span></button>
         <button class="card" data-go="hand"><b>יד ומצלמה</b><span>גובה היד משנה צבע ובהירות, ומשחק התאמת צבעים</span></button>
         <button class="card" data-go="gestures"><b>מחוות</b><span>אגרוף, סימן ניצחון ונפנוף מחליפים אפקטים וצבעים</span></button>
         <button class="card" data-go="drums"><b>מתופף</b><span>פדים של תופים ותיפוף על השולחן שמהבהבים בחבל</span></button>
@@ -143,12 +145,12 @@ addEventListener("error", e => showError(e.error || e.message));
 addEventListener("unhandledrejection", e => showError(e.reason));
 </script>
 <script type="module">
-import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js?v=4";
+import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js?v=5";
 
 const $ = id => document.getElementById(id);
 const strip = sharedStrip();   // also published as window.ledgameStrip for the tabs
-const V = "?v=4";   // bump on every release so phones don't mix a cached old file with a new one
-const PAGES = { hand: "camera.html" + V, gestures: "gestures.html" + V, drums: "drums.html" + V, rope: "rope.html" + V };
+const V = "?v=5";   // bump on every release so phones don't mix a cached old file with a new one
+const PAGES = { calib: "calib.html" + V, hand: "camera.html" + V, gestures: "gestures.html" + V, drums: "drums.html" + V, rope: "rope.html" + V };
 
 // ---- connection ----
 function setConnected(on, text) {
@@ -163,8 +165,14 @@ function setConnected(on, text) {
 }
 async function connect() {
   if (strip.connected) return;
-  try { $("pill").textContent = "מחפש…"; const name = await strip.connect(); setConnected(true, "מחובר: " + (name || "MELK")); }
+  try { $("pill").textContent = "מחפש…"; const name = await strip.connect(); setConnected(true, "מחובר: " + (name || "MELK")); firstRun(); }
   catch (e) { setConnected(false, "לא מחובר"); showError(e); }
+}
+// First connection on this phone opens calibration, so the rope's LED count is known before anything else.
+function firstRun() {
+  let known = false;
+  try { known = !!localStorage.getItem("ledgame.rope"); } catch {}
+  if (!known) show("calib");
 }
 $("connect").onclick = connect;
 $("pill").onclick = connect;

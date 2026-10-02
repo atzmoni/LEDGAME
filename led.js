@@ -1,6 +1,6 @@
 // Web Bluetooth driver for the duoCo StripX MELK-OA10 controller.
 // Frames are 9 bytes: 7E <len> <op> ... EF, no checksum, write-without-response on FFF0/FFF3.
-const SERVICE = 0xfff0, WRITE = 0xfff3;
+const SERVICE = 0xfff0, WRITE = 0xfff3, NOTIFY = 0xfff4;
 
 export const frames = {
   on:  () => [0x7E, 0x04, 0x04, 0xF0, 0x00, 0x01, 0xFF, 0x00, 0xEF],
@@ -15,6 +15,10 @@ export const frames = {
   mic:   on => [0x7E, 0x04, 0x07, on ? 1 : 0, 0xFF, 0xFF, 0xFF, 0x00, 0xEF],
   micEq: eq => [0x7E, 0x07, 0x03, 0x80 + eq, 0x04, 0xFF, 0xFF, 0x00, 0xEF],
   micSens: v => [0x7E, 0x04, 0x06, v, 0xFF, 0xFF, 0xFF, 0x00, 0xEF],
+  // State query listed for MELK-OA10 by elkbledom; any answer arrives on FFF4.
+  query: () => [0x7E, 0x00, 0x01, 0xFA, 0x00, 0x00, 0x00, 0x00, 0xEF],
+  // Addressable pixel count, 16-bit little-endian. Persists in the controller, like the duoCo app's own setting.
+  count: n => [0x7E, 0x07, 0x21, n & 0xFF, (n >> 8) & 0xFF, 0x00, 0xFF, 0x00, 0xEF],
 };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -36,6 +40,14 @@ export class Strip extends EventTarget {
     const server = await dev.gatt.connect();
     const svc = await server.getPrimaryService(SERVICE);
     this.ch = await svc.getCharacteristic(WRITE);
+    // Optional read-back channel; OC21 units stay silent, OA10 may answer queries here.
+    try {
+      const n = await svc.getCharacteristic(NOTIFY);
+      n.addEventListener("characteristicvaluechanged", e =>
+        this.dispatchEvent(new CustomEvent("notify", { detail: new Uint8Array(e.target.value.buffer) })));
+      await n.startNotifications();
+      this.canListen = true;
+    } catch { this.canListen = false; }
     // Handshake the open-source integration sends to MELK units first.
     await this.send([0x7E, 0x07, 0x83]);
     await sleep(300);
