@@ -96,6 +96,7 @@ select { font: .95rem var(--display); background: var(--bg); color: var(--fg); b
           <li>לחצו "התחבר לפס" ובחרו את MELK-OA10 ברשימה.</li>
         </ol>
         <button class="big" id="connect">התחבר לפס</button>
+        <p class="note" id="err" hidden></p>
         <p class="note" id="nobt" hidden>הדפדפן הזה לא תומך בבלוטות'. פתחו את הדף ב-Chrome באנדרואיד.</p>
       </div>
 
@@ -130,12 +131,24 @@ select { font: .95rem var(--display); background: var(--bg); color: var(--fg); b
   <iframe id="frame" title="מסך" hidden allow="camera; microphone; bluetooth; accelerometer"></iframe>
 </div>
 
+<script>
+// Shown on screen because a phone has no console: a failed load or connect explains itself.
+function showError(e) {
+  const el = document.getElementById("err"); if (!el) return;
+  const m = (e && (e.message || e.reason?.message)) || String(e);
+  if (/User cancelled|chooser/i.test(m)) return;
+  el.textContent = "שגיאה: " + m; el.hidden = false;
+}
+addEventListener("error", e => showError(e.error || e.message));
+addEventListener("unhandledrejection", e => showError(e.reason));
+</script>
 <script type="module">
-import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js";
+import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js?v=4";
 
 const $ = id => document.getElementById(id);
 const strip = sharedStrip();   // also published as window.ledgameStrip for the tabs
-const PAGES = { hand: "camera.html", gestures: "gestures.html", drums: "drums.html", rope: "rope.html" };
+const V = "?v=4";   // bump on every release so phones don't mix a cached old file with a new one
+const PAGES = { hand: "camera.html" + V, gestures: "gestures.html" + V, drums: "drums.html" + V, rope: "rope.html" + V };
 
 // ---- connection ----
 function setConnected(on, text) {
@@ -151,7 +164,7 @@ function setConnected(on, text) {
 async function connect() {
   if (strip.connected) return;
   try { $("pill").textContent = "מחפש…"; const name = await strip.connect(); setConnected(true, "מחובר: " + (name || "MELK")); }
-  catch { setConnected(false, "לא מחובר"); }
+  catch (e) { setConnected(false, "לא מחובר"); showError(e); }
 }
 $("connect").onclick = connect;
 $("pill").onclick = connect;
