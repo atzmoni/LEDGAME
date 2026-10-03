@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LedGame Sea Land</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: camera fills the top with the rope line and the two halves tinted; a huge command word and score sit over it; setup steps below. Single dark look. */
+:root {
+  --bg: #0d1117;
+  --panel: #161c25;
+  --line: #263041;
+  --fg: #e6ebf2;
+  --muted: #8592a6;
+  --accent: #35d0ba;
+  --bad: #ef6461;
+  --display: "Heebo", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--display); }
+main { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: calc(12px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+h1 { margin: 0; font-weight: 800; font-size: 1.4rem; }
+a { color: var(--accent); }
+.stage { position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 3 / 4; max-height: 55vh; width: 100%; }
+video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 24px; }
+.modes { display: flex; gap: 6px; }
+.modes a { flex: 1; text-align: center; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: #1f2734; color: var(--fg); text-decoration: none; font-weight: 600; }
+.modes a[aria-current="page"] { border-color: var(--accent); color: var(--accent); }
+.meter { position: absolute; top: 8%; bottom: 8%; inset-inline-start: 10px; width: 14px; border-radius: 99px; border: 2px solid rgba(255,255,255,.5); overflow: hidden; }
+.meter i { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: var(--accent); transition: height .08s linear; }
+.hud { position: absolute; top: 10px; inset-inline-end: 10px; display: grid; gap: 6px; justify-items: end; }
+.chip { font: 600 .85rem var(--mono); background: rgba(13,17,23,.78); padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); }
+.swatch { width: 40px; height: 40px; border-radius: 50%; border: 3px solid #fff; background: var(--sw, #000); }
+.toast { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 1.5rem; font-weight: 800; text-shadow: 0 2px 10px #000; white-space: nowrap; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: 600 1rem var(--display); color: var(--fg); background: #1f2734; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: #062a24; border-color: transparent; }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+button:disabled { opacity: .45; }
+.status { font: .85rem var(--mono); padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); }
+.status.on { color: var(--accent); border-color: var(--accent); }
+.status.err { color: var(--bad); border-color: var(--bad); }
+.legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.g { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; gap: 10px; align-items: center; transition: border-color .15s, background .15s; }
+.g .ico { font-size: 1.7rem; line-height: 1; }
+.g b { display: block; font-size: .95rem; }
+.g small { color: var(--muted); font-size: .8rem; }
+.g.active { border-color: var(--accent); background: #12302c; }
+.help { color: var(--muted); font-size: .9rem; margin: 0; }
+.embedded header, .embedded #connect, .embedded #status { display: none; }
+.stage { aspect-ratio: 4 / 3; max-height: 60vh; }
+.cmd { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font: 800 clamp(3rem, 18vw, 6rem)/1 var(--display); text-shadow: 0 4px 24px #000; pointer-events: none; }
+.score { position: absolute; top: 10px; inset-inline-start: 10px; display: flex; gap: 6px; }
+.timer { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: rgba(255,255,255,.15); }
+.timer i { display: block; height: 100%; width: 0%; background: #fff; }
+.steps { margin: 0; padding-inline-start: 20px; color: var(--muted); font-size: .92rem; display: grid; gap: 4px; }
+.steps li.done { color: var(--accent); }
+.big { font: 800 1.25rem var(--display); padding: 16px; flex: 1; }
+.flash-good .stage { box-shadow: 0 0 0 4px #3ddc84; }
+.flash-bad .stage { box-shadow: 0 0 0 4px var(--bad); }
+.embedded header, .embedded #connect, .embedded #status { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>ים יבשה</h1>
+    <a href="./">לדף הראשי</a>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="placeholder" id="ph">הנח את הטלפון כך שהמצלמה הקדמית רואה את החבל ואת השחקן</div>
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div class="score"><span class="chip" id="scoreChip">0 נק׳</span><span class="chip" id="lives">❤️❤️❤️</span></div>
+    <div class="hud"><span class="chip" id="where">—</span></div>
+    <div class="cmd" id="cmd"></div>
+    <div class="timer"><i id="timer"></i></div>
+  </div>
+
+  <div class="row">
+    <button class="primary" id="connect">התחבר לפס</button>
+    <span class="status" id="status">לא מחובר</span>
+  </div>
+
+  <section class="g" style="display:grid; gap:10px">
+    <ol class="steps">
+      <li id="s1">הפעל מצלמה וכוון אותה אל החבל.</li>
+      <li id="s2">סרוק את הקו. החבל נדלק בירוק, והאפליקציה מוצאת אותו. אפשר גם לגעת בשתי נקודות על הקו במסך.</li>
+      <li id="s3">בדוק שהצד הכחול הוא הים. אם לא, לחץ "החלף צדדים".</li>
+      <li id="s4">עמוד בצד אחד ולחץ "התחל".</li>
+    </ol>
+    <div class="row">
+      <button id="cam">הפעל מצלמה</button>
+      <button id="scan" disabled>סרוק קו</button>
+      <button id="swap" disabled>החלף צדדים</button>
+    </div>
+    <div class="row">
+      <button class="primary big" id="start" disabled>התחל</button>
+    </div>
+    <p class="help" id="best"></p>
+  </section>
+</main>
+
+<script type="module">
+import { sharedStrip, frames, colorFormat } from "./led.js?v=12";
+import { FilesetResolver, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs";
+
+const $ = id => document.getElementById(id);
+const strip = sharedStrip();
+const fmt = colorFormat();
+const SEA = { name: "ים", rgb: [0, 60, 255], css: "#2f6bff" };
+const LAND = { name: "יבשה", rgb: [255, 190, 0], css: "#ffbe00" };
+
+// line: a point and a unit direction in raw (unmirrored) video coordinates, 0..1
+let line = null, seaSign = 1, player = null;
+let best = 0; try { best = +localStorage.getItem("ledgame.seaBest") || 0; } catch {}
+$("best").textContent = best ? `השיא: ${best} נקודות` : "";
+
+function setStatus(t, cls) { const s = $("status"); s.textContent = t; s.className = "status " + (cls || ""); }
+$("connect").onclick = async () => {
+  try { setStatus("מחפש…"); const name = await strip.connect(); setStatus("מחובר: " + name, "on"); }
+  catch { setStatus("לא מחובר", "err"); }
+};
+strip.addEventListener("disconnect", () => setStatus("התנתק", "err"));
+const rope = (c, bri = 100) => { if (!strip.connected) return; strip.send(frames.rgb(...c, fmt)); strip.send(frames.bri(bri)); };
+
+// ---- camera + pose ----
+let pose = null;
+$("cam").onclick = async () => {
+  $("cam").disabled = true;
+  $("ph").textContent = "טוען זיהוי גוף…";
+  try {
+    const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm");
+    pose = await PoseLandmarker.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate: "GPU" },
+      runningMode: "VIDEO", numPoses: 1,
+    });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 }, audio: false });
+    const v = $("video"); v.srcObject = stream; await v.play();
+    $("ph").hidden = true; $("s1").className = "done";
+    $("scan").disabled = false;
+    requestAnimationFrame(loop);
+  } catch (e) { $("ph").textContent = "לא הצלחתי לפתוח מצלמה: " + e.message; $("cam").disabled = false; }
+};
+
+// ---- finding the rope: light it green, collect green pixels, fit their main axis ----
+const grab = document.createElement("canvas"); grab.width = 160; grab.height = 120;
+const gctx = grab.getContext("2d", { willReadFrequently: true });
+$("scan").onclick = async () => {
+  $("scan").disabled = true; $("cmd").textContent = "סורק…"; $("cmd").style.color = "#3ddc84";
+  rope([0, 255, 0]);
+  await new Promise(r => setTimeout(r, 900));
+  const found = detectLine();
+  $("scan").disabled = false; $("cmd").textContent = "";
+  if (found) setLine(found);
+  else $("cmd").textContent = "לא מצאתי", setTimeout(() => $("cmd").textContent = "", 1500);
+};
+function detectLine() {
+  gctx.drawImage($("video"), 0, 0, 160, 120);
+  const d = gctx.getImageData(0, 0, 160, 120).data;
+  const pts = [];
+  for (let y = 0; y < 120; y++) for (let x = 0; x < 160; x++) {
+    const i = (y * 160 + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2];
+    if (g > 120 && g > r * 1.5 && g > b * 1.3) pts.push([x / 160, y / 120]);
+  }
+  if (pts.length < 25) return null;
+  const mx = pts.reduce((s, p) => s + p[0], 0) / pts.length, my = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (const [x, y] of pts) { sxx += (x - mx) ** 2; syy += (y - my) ** 2; sxy += (x - mx) * (y - my); }
+  const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  // A rope is long and thin: the spread along it must clearly beat the spread across it.
+  const along = Math.abs(sxx * Math.cos(ang) ** 2 + syy * Math.sin(ang) ** 2 + 2 * sxy * Math.sin(ang) * Math.cos(ang));
+  const across = Math.abs(sxx + syy - along);
+  if (along < across * 4) return null;
+  return { x: mx, y: my, dx: Math.cos(ang), dy: Math.sin(ang) };
+}
+// Manual fallback: two taps on the (mirrored) picture.
+let taps = [];
+$("stage").addEventListener("click", e => {
+  if (!pose || running) return;
+  const r = $("stage").getBoundingClientRect();
+  taps.push([1 - (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]);
+  if (taps.length === 2) {
+    const [[x1, y1], [x2, y2]] = taps, len = Math.hypot(x2 - x1, y2 - y1) || 1;
+    setLine({ x: (x1 + x2) / 2, y: (y1 + y2) / 2, dx: (x2 - x1) / len, dy: (y2 - y1) / len });
+    taps = [];
+  }
+});
+function setLine(l) {
+  line = l; $("s2").className = "done"; $("s3").className = "done";
+  $("swap").disabled = false; $("start").disabled = false;
+  rope([255, 255, 255], 40);
+}
+$("swap").onclick = () => { seaSign = -seaSign; };
+const sideOf = (x, y) => Math.sign(line.dx * (y - line.y) - line.dy * (x - line.x)) * seaSign > 0 ? SEA : LAND;
+
+// ---- drawing ----
+const ctx = $("overlay").getContext("2d");
+let lastVideoTime = -1;
+function loop() {
+  const v = $("video"), c = $("overlay");
+  if (v.currentTime !== lastVideoTime) {
+    lastVideoTime = v.currentTime;
+    const res = pose.detectForVideo(v, performance.now());
+    const W = c.width = v.videoWidth, H = c.height = v.videoHeight;
+    ctx.clearRect(0, 0, W, H);
+    if (line) tint(W, H);
+    const lm = res.landmarks && res.landmarks[0];
+    player = null;
+    if (lm) {
+      // Feet decide the side; fall back to hips when the feet are out of the picture.
+      const feet = [lm[27], lm[28], lm[31], lm[32]].filter(p => p.visibility > 0.5);
+      const pts = feet.length ? feet : [lm[23], lm[24]];
+      player = { x: pts.reduce((s, p) => s + p.x, 0) / pts.length, y: pts.reduce((s, p) => s + p.y, 0) / pts.length };
+      ctx.fillStyle = "#fff";
+      for (const i of [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]) { const p = lm[i]; ctx.beginPath(); ctx.arc(p.x * W, p.y * H, 5, 0, 7); ctx.fill(); }
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(player.x * W, player.y * H, 16, 0, 7); ctx.stroke();
+    }
+    const side = line && player ? sideOf(player.x, player.y) : null;
+    $("where").textContent = side ? `אתה ב${side.name}` : (player ? "סמן את הקו" : "לא רואה שחקן");
+  }
+  requestAnimationFrame(loop);
+}
+function tint(W, H) {
+  // shade each half by testing a coarse grid against the line
+  const step = 16;
+  for (let y = 0; y < H; y += step) for (let x = 0; x < W; x += step) {
+    ctx.fillStyle = sideOf((x + step / 2) / W, (y + step / 2) / H) === SEA ? "rgba(47,107,255,.22)" : "rgba(255,190,0,.18)";
+    ctx.fillRect(x, y, step, step);
+  }
+  const k = 2;
+  ctx.strokeStyle = "#3ddc84"; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo((line.x - line.dx * k) * W, (line.y - line.dy * k) * H); ctx.lineTo((line.x + line.dx * k) * W, (line.y + line.dy * k) * H); ctx.stroke();
+}
+
+// ---- the game ----
+let running = false, score = 0, lives = 3, round = 0, streak = 0;
+let ac = null;
+function beep(f, d = 0.12) {
+  ac ||= new AudioContext();
+  const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = f;
+  g.gain.setValueAtTime(0.3, ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + d);
+  o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime + d);
+}
+function say(t) {
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = "he-IL"; u.rate = 1.2; speechSynthesis.speak(u); } catch {}
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function hud() {
+  $("scoreChip").textContent = `${score} נק׳`;
+  $("lives").textContent = "❤️".repeat(lives) + "🖤".repeat(3 - lives);
+}
+function flash(cls) { document.body.classList.add(cls); setTimeout(() => document.body.classList.remove(cls), 350); }
+
+$("start").onclick = async () => {
+  if (running) { running = false; return; }
+  ac ||= new AudioContext(); ac.resume();
+  running = true; score = 0; lives = 3; round = 0; streak = 0; hud();
+  $("start").textContent = "עצור"; $("s4").className = "done";
+  for (const n of ["3", "2", "1"]) { if (!running) break; $("cmd").style.color = "#fff"; $("cmd").textContent = n; beep(660); await wait(700); }
+  let prev = null;
+  while (running && lives > 0) {
+    round++;
+    // Time to react shrinks every round, down to under a second.
+    const window = Math.max(900, 2600 - round * 90);
+    // Sometimes the same command twice in a row, to catch players who jump anyway.
+    const c = prev && Math.random() < 0.3 ? prev : (Math.random() < 0.5 ? SEA : LAND);
+    prev = c;
+    $("cmd").textContent = c.name; $("cmd").style.color = c.css;
+    rope(c.rgb); say(c.name); beep(c === SEA ? 440 : 880);
+    const t0 = performance.now();
+    while (running && performance.now() - t0 < window) {
+      $("timer").style.width = (100 * (1 - (performance.now() - t0) / window)) + "%";
+      await wait(30);
+    }
+    if (!running) break;
+    const side = line && player ? sideOf(player.x, player.y) : null;
+    if (side === c) {
+      streak++; score += 1 + Math.floor(streak / 5);   // a bonus point for every 5 in a row
+      beep(1200, 0.08); flash("flash-good");
+    } else {
+      streak = 0; lives--; flash("flash-bad");
+      $("cmd").textContent = side ? "טעות!" : "איפה אתה?"; $("cmd").style.color = "#ef6461";
+      rope([255, 0, 0]); beep(160, 0.4);
+      await wait(900);
+    }
+    hud();
+    await wait(Math.max(250, 700 - round * 20));
+  }
+  const finished = running;
+  running = false; $("start").textContent = "התחל"; $("timer").style.width = "0%";
+  if (!finished && lives > 0) { $("cmd").textContent = ""; return; }
+  $("cmd").textContent = `${score}!`; $("cmd").style.color = "#fff";
+  say(`נגמר. ${score} נקודות`);
+  if (score > best) { best = score; try { localStorage.setItem("ledgame.seaBest", best); } catch {} $("best").textContent = `שיא חדש: ${best} נקודות!`; }
+  // victory lap on the rope
+  for (let i = 0; i < 6 && strip.connected; i++) { rope(i % 2 ? SEA.rgb : LAND.rgb); await wait(200); }
+};
+
+// Test hooks: place the line and the player without a camera.
+window.__seaTest = { setLine, setPlayer: p => { player = p; }, side: () => line && player && sideOf(player.x, player.y).name };
+</script>
+</body>
+</html>

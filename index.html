@@ -83,6 +83,7 @@ select { font: .95rem var(--display); background: var(--bg); color: var(--fg); b
     <button role="tab" data-tab="gestures" aria-selected="false">מחוות</button>
     <button role="tab" data-tab="face" aria-selected="false">פנים</button>
     <button role="tab" data-tab="drums" aria-selected="false">מתופף</button>
+    <button role="tab" data-tab="sea" aria-selected="false">ים יבשה</button>
     <button role="tab" data-tab="magic" aria-selected="false">קסמים</button>
     <button role="tab" data-tab="rope" aria-selected="false">חבל נשרף<small>בפיתוח</small></button>
   </nav>
@@ -106,6 +107,7 @@ select { font: .95rem var(--display); background: var(--bg); color: var(--fg); b
         <button class="card" data-go="hand"><b>יד ומצלמה</b><span>גובה היד משנה צבע ובהירות, ומשחק התאמת צבעים</span></button>
         <button class="card" data-go="gestures"><b>מחוות</b><span>ידיים או פנים: קריצה, חיוך ופה פתוח מחליפים צבעים ואפקטים</span></button>
         <button class="card" data-go="drums"><b>מתופף</b><span>64 פדים בצבעי הקשת, לופ של ביטים ותיפוף על השולחן</span></button>
+        <button class="card" data-go="sea"><b>ים יבשה</b><span>החבל על הרצפה, המצלמה בודקת באיזה צד אתה קופץ</span></button>
         <button class="card" data-go="magic"><b>קסמים</b><span>הקהל בוחר צבעים, ואחרי מילת הקסם הם מופיעים בחבל</span></button>
         <button class="card" data-go="rope"><b>חבל נשרף</b><span>משחק מסיבה עם לוח תוצאות</span><em class="tag">בפיתוח</em></button>
       </div>
@@ -146,12 +148,12 @@ addEventListener("error", e => showError(e.error || e.message));
 addEventListener("unhandledrejection", e => showError(e.reason));
 </script>
 <script type="module">
-import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js?v=11";
+import { sharedStrip, frames, colorFormat, setColorFormat } from "./led.js?v=12";
 
 const $ = id => document.getElementById(id);
 const strip = sharedStrip();   // also published as window.ledgameStrip for the tabs
-const V = "?v=11";   // bump on every release so phones don't mix a cached old file with a new one
-const PAGES = { hand: "camera.html" + V, gestures: "gestures.html" + V, face: "face.html" + V, drums: "drums.html" + V, magic: "magic.html" + V, rope: "rope.html" + V };
+const V = "?v=12";   // bump on every release so phones don't mix a cached old file with a new one
+const PAGES = { hand: "camera.html" + V, gestures: "gestures.html" + V, face: "face.html" + V, drums: "drums.html" + V, sea: "sea.html" + V, magic: "magic.html" + V, rope: "rope.html" + V };
 
 // ---- connection ----
 function setConnected(on, text) {
